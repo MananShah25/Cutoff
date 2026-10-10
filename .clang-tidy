@@ -1,0 +1,9 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  readability-redundant-*,
+  modernize-use-nullptr,
+  modernize-use-override
+WarningsAsErrors: ''

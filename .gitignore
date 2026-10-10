@@ -1,0 +1,5 @@
+build/
+results/
+.cache/
+.DS_Store
+*.vcd

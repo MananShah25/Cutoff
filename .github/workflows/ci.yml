@@ -1,0 +1,18 @@
+# NOT YET RUN: there is no remote repository yet (docs/decisions.md D-009).
+name: ci
+on: [push, pull_request]
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        preset: [debug, release, asan]
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - run: sudo apt-get update && sudo apt-get install -y verilator cmake ninja-build clang
+      - run: verilator --version
+      - run: cmake --preset ${{ matrix.preset }}
+        env: { CXX: clang++ }
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }}
