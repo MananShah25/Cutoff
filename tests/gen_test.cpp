@@ -495,9 +495,25 @@ TEST(GenConfigCheck, UnusableConfigsSayWhatToChange) {
   EXPECT_NE(validate(c).find("max_skip"), std::string::npos);
   c.max_skip = 257;
   EXPECT_NE(validate(c).find("max_skip"), std::string::npos);
-  c = {};
-  c.profile = Profile::G2;
-  EXPECT_NE(validate(c).find("G0"), std::string::npos);
-  EXPECT_THROW((void)generate(c, 1), std::invalid_argument);
+  for (const Profile p : {Profile::G1, Profile::G2, Profile::G3}) {
+    c = {};
+    c.profile = p;
+    EXPECT_EQ(validate(c), "");
+    EXPECT_NO_THROW((void)generate(c, 1));
+  }
   EXPECT_EQ(validate({}), "");
+}
+
+TEST(GenProfiles, G1G2G3RemainDeterministicAndSatisfyTheCommonInvariants) {
+  for (const Profile profile : {Profile::G1, Profile::G2, Profile::G3}) {
+    GenConfig cfg;
+    cfg.profile = profile;
+    for (int i = 0; i < 500; ++i) {
+      const std::uint64_t seed = program_seed(900 + static_cast<unsigned>(profile), i);
+      const Program a = generate(cfg, seed), b = generate(cfg, seed);
+      EXPECT_EQ(a.code, b.code);
+      EXPECT_EQ(check_structure(a, cfg), "") << "profile " << static_cast<unsigned>(profile) << " seed " << seed;
+      EXPECT_EQ(run_model(a.code, {100000, false}).status, Status::Exited);
+    }
+  }
 }

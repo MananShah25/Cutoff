@@ -168,7 +168,7 @@ TEST(CampaignConfigTest, ValidationSaysWhatToChange) {
   EXPECT_NE(msg([](CampaignConfig& c) { c.max_cycles = 10; }).find("max_cycles"), std::string::npos);
   EXPECT_NE(msg([](CampaignConfig& c) { c.gen.max_len = 1; c.gen.min_len = 5; }).find("max_len"), std::string::npos);
   EXPECT_NE(msg([](CampaignConfig& c) { c.core_name = "ibex"; }).find("picorv32"), std::string::npos);
-  EXPECT_NE(msg([](CampaignConfig& c) { c.gen.profile = gen::Profile::G2; }).find("G0"), std::string::npos);
+  EXPECT_EQ(msg([](CampaignConfig& c) { c.gen.profile = gen::Profile::G2; }), "");
 }
 
 TEST(CampaignConfigTest, ConfigHashCoversOnlyResultDeterminingSettings) {

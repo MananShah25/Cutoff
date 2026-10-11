@@ -35,7 +35,7 @@ class Builder {
     p.code.reserve(kInitWords + len + kEpilogueWords);
 
     // Init block: random values in x1..x30, then the data base register.
-    for (unsigned r = 1; r < kDataBaseReg; ++r) push_li(p.code, r, rng_.next32());
+    for (unsigned r = 1; r < kDataBaseReg; ++r) push_li(p.code, r, initial_value());
     push_li(p.code, kDataBaseReg, kDataBaseRegValue);
     p.body_begin = static_cast<std::uint32_t>(p.code.size());
 
@@ -55,14 +55,38 @@ class Builder {
     code.insert(code.end(), w.begin(), w.end());
   }
 
-  unsigned reg() { return rng_.below(31); }  // x0..x30; x31 is reserved
-  std::int32_t imm12() { return static_cast<std::int32_t>(rng_.below(4096)) - 2048; }
+  std::uint32_t initial_value() {
+    if (cfg_.profile != Profile::G2 || rng_.below(4) == 0) return rng_.next32();
+    constexpr std::array<std::uint32_t, 7> kBoundary = {0u, 1u, 0xffffffffu, 0x80000000u, 0x7fffffffu, 0xaaaaaaaau, 0x55555555u};
+    return kBoundary[rng_.below(kBoundary.size())];
+  }
+
+  unsigned reg() {  // x0..x30; x31 is reserved
+    if (cfg_.profile == Profile::G3 && rng_.below(4) != 0) return last_reg_;
+    const unsigned r = rng_.below(31);
+    if (cfg_.profile == Profile::G3) last_reg_ = r;
+    return r;
+  }
+  std::int32_t imm12() {
+    if (cfg_.profile != Profile::G2) return static_cast<std::int32_t>(rng_.below(4096)) - 2048;
+    constexpr std::array<std::int32_t, 7> kBoundary = {0, 1, -1, -2048, 2047, 0x55, -0x55};
+    return rng_.below(4) != 0 ? kBoundary[rng_.below(kBoundary.size())] : static_cast<std::int32_t>(rng_.below(4096)) - 2048;
+  }
+
+  Op draw_op() {
+    if (cfg_.profile != Profile::G1) return kLegalOps[rng_.below(static_cast<std::uint32_t>(kLegalOps.size()))];
+    // G1: weighted arithmetic-heavy regression mix: 50% ALU, 25% memory, 25% control.
+    const std::uint32_t bucket = rng_.below(100);
+    if (bucket < 50) return kLegalOps[18 + rng_.below(20)];
+    if (bucket < 75) return kLegalOps[10 + rng_.below(8)];
+    return kLegalOps[rng_.below(10)];
+  }
 
   // Pass 1: choose the opcode of every slot.
   void draw_slots(std::uint32_t len) {
     slots_.assign(len, Slot{});
     for (std::uint32_t i = 0; i < len;) {
-      const Op op = kLegalOps[rng_.below(static_cast<std::uint32_t>(kLegalOps.size()))];
+      const Op op = draw_op();
       if (op == Op::JALR) {
         if (i + 1 >= len) continue;  // no room for the AUIPC/JALR pair; draw again
         slots_[i] = {Op::AUIPC, true};
@@ -156,7 +180,7 @@ class Builder {
       case Op::SLLI: case Op::SRLI: case Op::SRAI: {
         const unsigned rd = reg();
         const unsigned rs1 = reg();
-        const unsigned shamt = rng_.below(32);
+        const unsigned shamt = cfg_.profile == Profile::G2 && rng_.below(4) != 0 ? std::array<unsigned, 3>{0, 1, 31}[rng_.below(3)] : rng_.below(32);
         return s.op == Op::SLLI ? rv::slli(rd, rs1, shamt) : s.op == Op::SRLI ? rv::srli(rd, rs1, shamt) : rv::srai(rd, rs1, shamt);
       }
       case Op::ADD: case Op::SUB: case Op::SLL: case Op::SLT: case Op::SLTU:
@@ -187,12 +211,12 @@ class Builder {
   Rng rng_;
   std::vector<Slot> slots_;
   unsigned jalr_base_reg_ = 1;
+  unsigned last_reg_ = 0;
 };
 
 }  // namespace
 
 std::string validate(const GenConfig& cfg) {
-  if (cfg.profile != Profile::G0) return "only profile G0 exists so far; G1-G3 arrive in Step 8. Set profile = G0.";
   if (cfg.min_len < 1) return "min_len must be at least 1.";
   if (cfg.max_len < cfg.min_len) return "max_len must not be smaller than min_len.";
   if (kInitWords + cfg.max_len + kEpilogueWords > kMaxCodeWords)
