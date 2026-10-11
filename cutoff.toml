@@ -22,6 +22,19 @@ level = "c1"           # c1 = final registers + memory hash (c2, c3 arrive in a 
 max_cycles = 200000    # core cycle limit per program; hitting it is reported as a hang
 max_instructions = 100000
 
+[species]
+op = true              # SP-op: instruction kinds
+cross = true           # SP-cross: instruction kind x operand classes
+
+[stop]                 # defaults are placeholders until the Step 11 benchmark chooses them
+epsilon = 0.0          # stop when the risk stays below this; 0 = rule off
+confirm = 3            # ... for this many consecutive checkpoints
+min_programs = 1000    # never stop before this many programs
+checkpoint = 1000      # evaluate the risk and save a checkpoint every N programs
+estimator = "good-turing"
+plateau_window = 5000  # baseline only: "no new species in the last N programs"
+max_hours = 0.0        # wall-clock budget across all sessions; 0 = none
+
 [output]
 dir = "results"
 max_failure_dirs = 20  # failure folders written per run (all failures are still counted)
@@ -29,3 +42,4 @@ max_failure_dirs = 20  # failure folders written per run (all failures are still
 [debug]                # test hooks; leave at their defaults
 corrupt_core_every = 0
 crash_worker_at = -1
+interrupt_after = 0

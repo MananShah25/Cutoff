@@ -1,0 +1,13 @@
+{
+  "schema": "cutoff-summary-provisional-2",
+  "run": {"id": "cut-KILL", "tool_version": "0.0.1", "git_commit": "09f1b6287d6d", "git_tree_dirty": false, "config_hash": "0x5067cd15f9996811", "sessions": 2},
+  "environment": {"cpu": "Apple M3", "logical_cores": 8, "verilator": "5.052 2026-09-05", "compiler": "Apple LLVM 16.0.0 (clang-1600.0.26.6)"},
+  "core": {"name": "picorv32", "commit": "ef203c2b0a3f"},
+  "campaign": {"seed": 3, "programs_requested": 200000, "programs_run": 200000, "generator_version": 1, "profile": "g0", "checker": "c1", "stop_reason": "program-count", "exit_code": 0},
+  "stop": {"rule_enabled": false, "epsilon": 0, "confirm": 3, "min_programs": 1000, "checkpoint": 1000, "estimator": "good-turing", "risk_used": 0.00029, "consecutive_checkpoints_below_epsilon": 0, "programs_at_stop": 200000, "fixed_budget": 200000, "plateau_window": 5000, "plateau_rule_would_have_stopped_at": 71000},
+  "risk": {"sets": [{"name": "op", "universe": 41, "species_seen": 38, "q1": 0, "q2": 0, "v": 5771306, "good_turing": 0, "incidence": 0, "coverage": 0, "chao2": 38, "chao2_bias_corrected": 38, "programs_since_new": 199997}, {"name": "cross", "universe": 2624, "species_seen": 899, "q1": 58, "q2": 25, "v": 7504573, "good_turing": 0.00029, "incidence": 7.72862094e-06, "coverage": 7.72858762e-06, "chao2": 966.28, "chao2_bias_corrected": 962.576605, "programs_since_new": 773}]},
+  "failures": {"count": 0, "failure_dirs_written": 0, "by_verdict": {"generator-fault": 0, "hang": 0, "status-mismatch": 0, "exit-code-mismatch": 0, "register-mismatch": 0, "memory-mismatch": 0}},
+  "totals": {"core_cycles": 118422674, "model_instructions": 24236648},
+  "workers": 8,
+  "timing": {"started_utc": "2026-10-11T01:56:25Z", "wall_seconds": 15.1096, "programs_per_second": 13236.7}
+}

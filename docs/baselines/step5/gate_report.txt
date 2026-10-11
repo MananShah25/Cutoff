@@ -1,0 +1,32 @@
+== 1. regression against the Step 4 gate (100,000 programs, seed 1, stop rule off)
+PASS  regress 1 worker(s): exit code 0 (got 0)
+PASS  regress 1 worker(s): events.bin == Step 4 gate 812caad7a0ed
+PASS  regress 8 worker(s): exit code 0 (got 0)
+PASS  regress 8 worker(s): events.bin == Step 4 gate 812caad7a0ed
+PASS  regress: risk_curve.csv identical for 1 and 8 workers
+== 2. stop rule (epsilon 0.001, confirm 3, min 1000, checkpoint 1000)
+PASS  stop 1 worker(s): exit code 0 (got 0)
+      stopped after 74000 programs
+PASS  stop 1 worker(s): stopped before the budget, on a checkpoint
+PASS  stop 8 worker(s): exit code 0 (got 0)
+      stopped after 74000 programs
+PASS  stop 8 worker(s): stopped before the budget, on a checkpoint
+PASS  stop: events.bin identical for 1 and 8 workers
+PASS  stop: risk_curve.csv identical for 1 and 8 workers
+PASS  budget ends first: exit code 2 (got 2)
+== 3. interruption and resume (200,000 programs, seed 3, stop rule off)
+PASS  SIGINT: exit code 130 (got 130)
+PASS  INT: no worker process left behind (found 0)
+      events.bin held 40256 records when it was cut (the last checkpoint may be earlier)
+PASS  INT: resume exit code 0 (got 0)
+PASS  INT: resumed events.bin == uninterrupted (29f9e8f8b25c)
+PASS  INT: resumed risk_curve.csv == uninterrupted
+scripts/step5_gate.sh: line 60: 16956 Killed: 9               "$cutoff" run --max-programs 200000 --seed 3 --workers 8 --results-dir "$out" --no-progress --run-id "cut-$how" > "$out/cut-$how.txt" 2>&1
+      SIGKILL: exit status 137
+PASS  KILL: no worker process left behind (found 0)
+      events.bin held 41398 records when it was cut (the last checkpoint may be earlier)
+PASS  KILL: resume exit code 0 (got 0)
+PASS  KILL: resumed events.bin == uninterrupted (29f9e8f8b25c)
+PASS  KILL: resumed risk_curve.csv == uninterrupted
+results in /Users/mananshah25/GithubRepos/Cutoff/results/step5-20261011-015410; failures: 0
+script exit 0
