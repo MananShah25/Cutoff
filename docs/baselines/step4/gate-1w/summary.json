@@ -1,0 +1,11 @@
+{
+  "schema": "cutoff-summary-provisional-1",
+  "run": {"id": "gate-1w", "tool_version": "0.0.1", "git_commit": "346778d813d1", "git_tree_dirty": false, "config_hash": "0x7ef379296e7cf091"},
+  "environment": {"cpu": "Apple M3", "logical_cores": 8, "verilator": "5.052 2026-09-05", "compiler": "Apple LLVM 16.0.0 (clang-1600.0.26.6)"},
+  "core": {"name": "picorv32", "commit": "ef203c2b0a3f"},
+  "campaign": {"seed": 1, "programs_requested": 100000, "programs_run": 100000, "generator_version": 1, "profile": "g0", "checker": "c1", "stop_reason": "program-count", "exit_code": 0},
+  "failures": {"count": 0, "failure_dirs_written": 0, "by_verdict": {"generator-fault": 0, "hang": 0, "status-mismatch": 0, "exit-code-mismatch": 0, "register-mismatch": 0, "memory-mismatch": 0}},
+  "totals": {"core_cycles": 59167767, "model_instructions": 12110428},
+  "workers": 1,
+  "timing": {"started_utc": "2026-10-11T00:46:35Z", "wall_seconds": 26.1787, "programs_per_second": 3819.91}
+}
