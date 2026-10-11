@@ -20,7 +20,7 @@ fi
 cmake --preset release > /dev/null && cmake --build --preset release > /dev/null || { echo "step5_gate: release build failed" >&2; exit 3; }
 [ -x "$cutoff" ] || { echo "step5_gate: no release binary" >&2; exit 3; }
 head_commit=$(git -C "$root" rev-parse --short=12 HEAD)
-built_commit=$("$cutoff" run --max-programs 2 --workers 1 --results-dir "$out/probe" --run-id probe --no-progress > /dev/null 2>&1; grep -o '"git_commit": "[0-9a-f]*"' "$out/probe/summary.json" | cut -d'"' -f4; rm -rf "$out/probe")
+built_commit=$("$cutoff" run --max-programs 2 --workers 1 --results-dir "$out/probe" --run-id probe --no-progress > /dev/null 2>&1; grep -o '"git_commit": "[0-9a-f]*"' "$out/probe/probe/summary.json" | cut -d'"' -f4; rm -rf "$out/probe")
 if [ "$built_commit" != "$head_commit" ]; then echo "step5_gate: binary was built from $built_commit but HEAD is $head_commit" >&2; exit 3; fi
 fail=0
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
