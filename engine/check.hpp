@@ -26,12 +26,16 @@ struct Execution {
   gen::Program program;
   ModelResult model;
   RunResult core;
+  risk::SpeciesIds species;  // empty unless the campaign tracks species
 };
 
 // Generates program `program_id` of the campaign and runs it on the model and on the core.
 Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id);
 
-// execute_program + check_c1, reduced to the compact record that goes into events.bin.
+// execute_program + check_c1: the compact record for events.bin plus the species for the estimators.
+ProgramResult evaluate(const CampaignConfig& cfg, std::uint64_t program_id);
+
+// The record alone (convenience for tests and tools).
 EventRecord evaluate_program(const CampaignConfig& cfg, std::uint64_t program_id);
 
 std::uint64_t hash_regs(const std::array<std::uint32_t, 32>& regs);

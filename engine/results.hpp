@@ -1,42 +1,51 @@
 #pragma once
-// results/<run-id>/: config.toml, events.bin, summary.json and failures/.
+// results/<run-id>/: config.toml, events.bin, risk_curve.csv, checkpoint.bin, summary.json and failures/.
 
-#include <array>
 #include <cstdint>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "campaign.hpp"
 #include "campaign_config.hpp"
+#include "checkpoint.hpp"
+#include "protocol.hpp"
+#include "risk_monitor.hpp"
+#include "totals.hpp"
 
 namespace cutoff::engine {
 
-struct Totals {
-  std::uint64_t programs = 0;
-  std::uint64_t failures = 0;
-  std::array<std::uint64_t, 7> by_verdict{};  // indexed by Verdict
-  std::uint64_t core_cycles = 0;
-  std::uint64_t model_instructions = 0;
-  std::uint32_t failure_dirs_written = 0;
+// Everything summary.json reports beyond the totals.
+struct SummaryInput {
+  std::string run_id;
+  std::string started_utc;
+  double wall_seconds = 0;          // all sessions together
+  std::uint32_t workers = 0;
+  std::uint32_t sessions = 1;       // 1 + number of resumes
+  int exit_code = 0;
+  std::string stop_reason;          // threshold | budget | program-count | time-budget | error
+  std::uint64_t programs_at_stop = 0;
+  std::vector<SetSummary> sets;
+  double risk_used = 0;             // the value the stop rule compares with epsilon
+  std::uint64_t plateau_stop_at = 0;
+  std::uint32_t stop_consecutive = 0;
 };
 
-class ResultsWriter : public RecordSink {
+class ResultsWriter {
  public:
-  // Creates `run_dir` (which must not already exist), writes config.toml and the events header.
+  // New run: creates `run_dir` (which must not exist), writes config.toml and the events header.
   static std::unique_ptr<ResultsWriter> create(const CampaignConfig& cfg, const std::string& run_dir, std::string& error);
+  // Continues a run: cuts events.bin back to the checkpoint, removes failure folders of programs that will be re-run,
+  // restores the totals and rewrites config.toml with the current settings.
+  static std::unique_ptr<ResultsWriter> resume(const CampaignConfig& cfg, const std::string& run_dir, const Checkpoint& cp, std::string& error);
 
-  void on_record(const EventRecord& rec) override;
-
-  struct Timing {
-    std::string started_utc;
-    double wall_seconds = 0;
-  };
-  // Flushes events.bin and writes summary.json. `exit_code` and `stop_reason` are recorded in the summary.
-  bool finish(const std::string& run_id, const Timing& timing, std::uint32_t workers, int exit_code,
-              const std::string& stop_reason, std::string& error);
-
+  void append(const EventRecord& rec);  // events.bin, totals, and (for the first max_failure_dirs failures) a failure folder
+  bool flush(std::string& error);
+  std::uint64_t events_bytes();         // after flush
   const Totals& totals() const { return totals_; }
+  const std::string& dir() const { return dir_; }
+
+  bool write_summary(const SummaryInput& in, std::string& error);
 
  private:
   ResultsWriter(const CampaignConfig& cfg, std::string run_dir) : cfg_(cfg), dir_(std::move(run_dir)) {}

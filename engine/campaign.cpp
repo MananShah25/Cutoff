@@ -43,20 +43,35 @@ void close_worker_fds(Worker& w) {
 
 }  // namespace
 
-bool OrderedDelivery::push(const EventRecord& rec) {
-  if (rec.program_id < next_ || !waiting_.emplace(rec.program_id, rec).second) return false;
+bool OrderedDelivery::push(const ProgramResult& result) {
+  if (stopped_) return true;
+  const std::uint64_t id = result.rec.program_id;
+  if (id < next_ || !waiting_.emplace(id, result).second) return false;
   for (auto it = waiting_.begin(); it != waiting_.end() && it->first == next_; it = waiting_.begin()) {
-    sink_.on_record(it->second);
+    const bool go_on = sink_.on_record(it->second);
     waiting_.erase(it);
     ++next_;
+    if (!go_on) {
+      stopped_ = true;
+      waiting_.clear();
+      break;
+    }
   }
   return true;
 }
 
-CampaignStatus run_campaign(const CampaignConfig& cfg, RecordSink& sink, const std::function<void(std::uint64_t)>& on_progress) {
+CampaignStatus run_campaign(const CampaignConfig& cfg, RecordSink& sink, const CampaignControl& control,
+                            const std::function<void(std::uint64_t)>& on_progress) {
   CampaignStatus status;
-  const std::uint64_t total = cfg.programs;
-  const std::uint32_t nworkers = static_cast<std::uint32_t>(std::min<std::uint64_t>(resolved_workers(cfg), (total + cfg.batch_size - 1) / cfg.batch_size));
+  const std::uint64_t first = control.first_id;
+  const std::uint64_t total = cfg.programs;  // ids [first, total)
+  status.next_id = first;
+  if (first >= total) {  // nothing left to run
+    status.ok = true;
+    return status;
+  }
+  const std::uint64_t remaining = total - first;
+  const std::uint32_t nworkers = static_cast<std::uint32_t>(std::min<std::uint64_t>(resolved_workers(cfg), (remaining + cfg.batch_size - 1) / cfg.batch_size));
 
   // A write to a dead worker must fail with EPIPE instead of killing the whole process.
   struct sigaction ignore {}, old_pipe {};
@@ -78,7 +93,9 @@ CampaignStatus run_campaign(const CampaignConfig& cfg, RecordSink& sink, const s
       close(down[0]); close(down[1]); close(up[0]); close(up[1]);
       break;
     }
-    if (pid == 0) {  // worker
+    if (pid == 0) {  // worker: Ctrl-C belongs to the orchestrator, which winds the workers down itself
+      signal(SIGINT, SIG_IGN);
+      signal(SIGTERM, SIG_IGN);
       close(down[1]);
       close(up[0]);
       for (auto& other : workers) close_worker_fds(other);  // descriptors of earlier workers
@@ -115,11 +132,15 @@ CampaignStatus run_campaign(const CampaignConfig& cfg, RecordSink& sink, const s
     return status;
   }
 
-  std::uint64_t next_to_assign = 0;
-  OrderedDelivery delivery(sink);
+  std::uint64_t next_to_assign = first;
+  OrderedDelivery delivery(sink, first);
   auto last_progress = std::chrono::steady_clock::now();
 
-  while (delivery.delivered() < total && status.error.empty()) {
+  while (delivery.next_id() < total && !delivery.stopped_by_sink() && status.error.empty()) {
+    if (control.interrupt != nullptr && *control.interrupt != 0) {
+      status.interrupted = true;
+      break;
+    }
     // Keep every worker fed with up to two batches.
     for (auto& w : workers) {
       while (w.open && next_to_assign < total && w.outstanding <= cfg.batch_size) {
@@ -167,36 +188,37 @@ CampaignStatus run_campaign(const CampaignConfig& cfg, RecordSink& sink, const s
       }
       w.inbox.insert(w.inbox.end(), buf, buf + n);
       std::size_t off = 0;
-      while (w.inbox.size() - off >= sizeof(EventRecord)) {
-        EventRecord rec;
-        std::memcpy(&rec, w.inbox.data() + off, sizeof rec);
-        off += sizeof rec;
-        if (rec.program_id >= total || !delivery.push(rec)) {
-          status.error = "a worker returned program id " + std::to_string(rec.program_id) + " which is out of range or was already delivered; this is a bug in Cutoff.";
+      for (;;) {
+        ProgramResult result;
+        const std::size_t used = decode_frame(w.inbox.data() + off, w.inbox.size() - off, result);
+        if (used == 0) break;
+        off += used;
+        if (result.rec.program_id >= total || !delivery.push(result)) {
+          status.error = "a worker returned program id " + std::to_string(result.rec.program_id) + " which is out of range or was already delivered; this is a bug in Cutoff.";
           break;
         }
         if (w.outstanding > 0) --w.outstanding;
       }
       w.inbox.erase(w.inbox.begin(), w.inbox.begin() + static_cast<std::ptrdiff_t>(off));
+      if (!status.error.empty()) break;
+      if (delivery.stopped_by_sink()) break;
     }
     if (!status.error.empty()) break;
 
-    if (!status.error.empty()) break;
-    status.programs_done = delivery.delivered();
-
     const auto now = std::chrono::steady_clock::now();
     if (on_progress && now - last_progress >= std::chrono::milliseconds(200)) {
-      on_progress(delivery.delivered());
+      on_progress(delivery.next_id());
       last_progress = now;
     }
   }
 
-  status.programs_done = delivery.delivered();
-  const bool finished = status.error.empty() && delivery.delivered() == total;
-  shutdown(finished);
+  status.next_id = delivery.next_id();
+  status.stopped_by_sink = delivery.stopped_by_sink();
+  const bool planned_end = status.error.empty() && !status.interrupted && (delivery.next_id() >= total || delivery.stopped_by_sink());
+  shutdown(status.error.empty());
   sigaction(SIGPIPE, &old_pipe, nullptr);
-  if (finished && on_progress) on_progress(total);
-  status.ok = finished && status.error.empty();
+  if (planned_end && on_progress) on_progress(delivery.next_id());
+  status.ok = planned_end;
   return status;
 }
 

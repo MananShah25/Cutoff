@@ -5,7 +5,7 @@ add_custom_target(cutoff_version
   COMMENT "Recording git commit")
 
 add_library(cutoff_engine STATIC
-  protocol.cpp toml_lite.cpp campaign_config.cpp check.cpp worker.cpp campaign.cpp results.cpp system_info.cpp run.cpp)
+  protocol.cpp toml_lite.cpp campaign_config.cpp check.cpp worker.cpp campaign.cpp results.cpp checkpoint.cpp risk_monitor.cpp system_info.cpp run.cpp)
 add_dependencies(cutoff_engine cutoff_version)
 target_include_directories(cutoff_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} PRIVATE ${CMAKE_BINARY_DIR}/generated)
-target_link_libraries(cutoff_engine PUBLIC cutoff_gen cutoff_model cutoff_sim PRIVATE cutoff_warnings)
+target_link_libraries(cutoff_engine PUBLIC cutoff_gen cutoff_model cutoff_risk cutoff_sim PRIVATE cutoff_warnings)

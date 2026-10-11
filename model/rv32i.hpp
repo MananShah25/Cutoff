@@ -24,6 +24,23 @@ inline constexpr std::size_t kNumOps = static_cast<std::size_t>(Op::Illegal) + 1
 
 const char* op_name(Op op);
 
+// Which source registers an instruction kind actually reads (the rs1/rs2 bits of other kinds are immediate bits).
+constexpr bool reads_rs1(Op op) {
+  switch (op) {
+    case Op::LUI: case Op::AUIPC: case Op::JAL: case Op::FENCE: case Op::ECALL: case Op::EBREAK: case Op::Illegal: return false;
+    default: return true;
+  }
+}
+constexpr bool reads_rs2(Op op) {
+  switch (op) {
+    case Op::BEQ: case Op::BNE: case Op::BLT: case Op::BGE: case Op::BLTU: case Op::BGEU:
+    case Op::SB: case Op::SH: case Op::SW:
+    case Op::ADD: case Op::SUB: case Op::SLL: case Op::SLT: case Op::SLTU: case Op::XOR: case Op::SRL: case Op::SRA: case Op::OR: case Op::AND:
+      return true;
+    default: return false;
+  }
+}
+
 struct Decoded {
   Op op = Op::Illegal;
   std::uint8_t rd = 0, rs1 = 0, rs2 = 0;

@@ -33,6 +33,8 @@ struct RetireRecord {
   std::uint32_t pc = 0, insn = 0, next_pc = 0;
   std::uint8_t rd = 0;
   std::uint32_t rd_value = 0;
+  std::uint32_t rs1_value = 0;  // value read from rs1 before the instruction ran; 0 if the kind does not read rs1
+  std::uint32_t rs2_value = 0;  // likewise for rs2
 };
 
 // One store as the core's bus shows it: word address, replicated data word, byte strobes.

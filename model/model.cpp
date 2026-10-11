@@ -130,6 +130,8 @@ Status Model::step() {
   const std::uint32_t b = regs_[d.rs2];
   const std::uint32_t imm = static_cast<std::uint32_t>(d.imm);
   bool taken = false;
+  rec.rs1_value = reads_rs1(d.op) ? a : 0;
+  rec.rs2_value = reads_rs2(d.op) ? b : 0;
 
   switch (d.op) {
     case Op::LUI: write_reg(d.rd, imm, rec); break;

@@ -58,7 +58,7 @@ std::string slurp(const fs::path& p) {
 
 struct Collect : RecordSink {
   std::vector<EventRecord> records;
-  void on_record(const EventRecord& r) override { records.push_back(r); }
+  bool on_record(const ProgramResult& r) override { records.push_back(r.rec); return true; }
 };
 
 CampaignConfig small_config(std::uint64_t programs = 200) {
@@ -306,18 +306,18 @@ TEST(OrderedDeliveryTest, ReleasesRecordsInIdOrderWhateverTheArrivalOrder) {
     std::iota(arrival.begin(), arrival.end(), 0);
     std::shuffle(arrival.begin(), arrival.end(), rng);
     Collect sink;
-    OrderedDelivery d(sink);
+    OrderedDelivery d(sink, 0);
     std::size_t max_waiting = 0;
     for (const auto id : arrival) {
-      EventRecord r;
-      r.program_id = id;
+      ProgramResult r;
+      r.rec.program_id = id;
       ASSERT_TRUE(d.push(r));
       max_waiting = std::max(max_waiting, d.waiting());
       // Whatever has been delivered so far is exactly the prefix 0..k-1.
       for (std::size_t i = 0; i < sink.records.size(); ++i) ASSERT_EQ(sink.records[i].program_id, i);
     }
     EXPECT_EQ(sink.records.size(), n);
-    EXPECT_EQ(d.delivered(), n);
+    EXPECT_EQ(d.next_id(), n);
     EXPECT_EQ(d.waiting(), 0u);
     if (n >= 17) EXPECT_GT(max_waiting, 1u) << "the shuffle really did deliver records out of order";
   }
@@ -325,16 +325,16 @@ TEST(OrderedDeliveryTest, ReleasesRecordsInIdOrderWhateverTheArrivalOrder) {
 
 TEST(OrderedDeliveryTest, HoldsBackRecordsUntilTheGapIsFilledAndRejectsBadIds) {
   Collect sink;
-  OrderedDelivery d(sink);
-  EventRecord r;
-  r.program_id = 2;
+  OrderedDelivery d(sink, 0);
+  ProgramResult r;
+  r.rec.program_id = 2;
   EXPECT_TRUE(d.push(r));
-  r.program_id = 1;
+  r.rec.program_id = 1;
   EXPECT_TRUE(d.push(r));
   EXPECT_EQ(sink.records.size(), 0u) << "id 0 is missing, so nothing may be released";
   EXPECT_EQ(d.waiting(), 2u);
   EXPECT_FALSE(d.push(r)) << "duplicate of a waiting id";
-  r.program_id = 0;
+  r.rec.program_id = 0;
   EXPECT_TRUE(d.push(r));
   EXPECT_EQ(sink.records.size(), 3u);
   EXPECT_FALSE(d.push(r)) << "id already delivered";
@@ -350,7 +350,7 @@ TEST(Campaign, DeliversEveryProgramInIdOrder) {
   ASSERT_TRUE(st.ok) << st.error;
   ASSERT_EQ(sink.records.size(), 500u);
   for (std::uint64_t i = 0; i < 500; ++i) ASSERT_EQ(sink.records[i].program_id, i);
-  EXPECT_EQ(st.programs_done, 500u);
+  EXPECT_EQ(st.next_id, 500u);
 }
 
 TEST(Campaign, ResultsAreIdenticalForAnyWorkerCountAndBatchSize) {
@@ -384,7 +384,7 @@ TEST(Campaign, ReportsProgressUpToTheTotal) {
   CampaignConfig cfg = small_config(300);
   Collect sink;
   std::uint64_t last = 0;
-  ASSERT_TRUE(run_campaign(cfg, sink, [&](std::uint64_t done) { EXPECT_GE(done, last); last = done; }).ok);
+  ASSERT_TRUE(run_campaign(cfg, sink, {}, [&](std::uint64_t done) { EXPECT_GE(done, last); last = done; }).ok);
   EXPECT_EQ(last, 300u);
 }
 
@@ -400,7 +400,7 @@ TEST(Campaign, ADyingWorkerStopsTheRunWithAClearMessageInsteadOfHanging) {
   EXPECT_FALSE(st.ok);
   EXPECT_NE(st.error.find("died"), std::string::npos) << st.error;
   EXPECT_NE(st.error.find("exit status 9"), std::string::npos) << st.error;
-  EXPECT_LT(st.programs_done, 400u);
+  EXPECT_LT(st.next_id, 400u);
   EXPECT_LT(secs, 30.0);
   // Records delivered before the failure are still the correct prefix.
   for (std::size_t i = 0; i < sink.records.size(); ++i) EXPECT_EQ(sink.records[i].program_id, i);

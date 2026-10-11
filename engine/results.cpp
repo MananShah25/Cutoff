@@ -1,6 +1,7 @@
 #include "results.hpp"
 
 #include <cinttypes>
+#include <cstdlib>
 #include <cstdio>
 #include <filesystem>
 #include <sstream>
@@ -62,6 +63,7 @@ std::uint64_t config_hash(const CampaignConfig& cfg) {
   canonical.batch_size = 64;
   canonical.results_dir.clear();
   canonical.max_failure_dirs = 0;
+  canonical.interrupt_after = 0;
   std::uint64_t h = 0xcbf29ce484222325ULL;
   for (const char c : to_toml(canonical)) {
     h ^= static_cast<unsigned char>(c);
@@ -73,7 +75,7 @@ std::uint64_t config_hash(const CampaignConfig& cfg) {
 std::unique_ptr<ResultsWriter> ResultsWriter::create(const CampaignConfig& cfg, const std::string& run_dir, std::string& error) {
   std::error_code ec;
   if (fs::exists(run_dir, ec)) {
-    error = "results folder " + run_dir + " already exists. Pick another --run-id or remove it.";
+    error = "results folder " + run_dir + " already exists. Pick another --run-id, remove it, or continue it with --resume " + run_dir + ".";
     return nullptr;
   }
   fs::create_directories(fs::path(run_dir) / "failures", ec);
@@ -97,7 +99,40 @@ std::unique_ptr<ResultsWriter> ResultsWriter::create(const CampaignConfig& cfg, 
   return w;
 }
 
-void ResultsWriter::on_record(const EventRecord& rec) {
+std::unique_ptr<ResultsWriter> ResultsWriter::resume(const CampaignConfig& cfg, const std::string& run_dir, const Checkpoint& cp, std::string& error) {
+  std::error_code ec;
+  const fs::path events_path = fs::path(run_dir) / "events.bin";
+  const auto size = fs::exists(events_path, ec) ? fs::file_size(events_path, ec) : 0;
+  if (size < cp.events_bytes) {
+    error = events_path.string() + " is shorter than the checkpoint says (" + std::to_string(size) + " < " + std::to_string(cp.events_bytes) +
+            " bytes); the run folder was modified and cannot be resumed.";
+    return nullptr;
+  }
+  fs::resize_file(events_path, cp.events_bytes, ec);  // drop whatever was written after the checkpoint
+  if (ec) {
+    error = "cannot truncate " + events_path.string() + ": " + ec.message();
+    return nullptr;
+  }
+  // Failure folders of programs that are about to be re-run are removed so they are rewritten identically.
+  const fs::path failures = fs::path(run_dir) / "failures";
+  fs::create_directories(failures, ec);
+  for (const auto& entry : fs::directory_iterator(failures, ec)) {
+    const std::string name = entry.path().filename().string();
+    if (name.rfind("program-", 0) != 0) continue;
+    if (std::strtoull(name.c_str() + 8, nullptr, 10) >= cp.next_program_id) fs::remove_all(entry.path(), ec);
+  }
+  std::unique_ptr<ResultsWriter> w(new ResultsWriter(cfg, run_dir));
+  w->totals_ = cp.totals;
+  w->events_.open(events_path, std::ios::binary | std::ios::app);
+  if (!w->events_) {
+    error = "cannot append to " + events_path.string() + ".";
+    return nullptr;
+  }
+  if (!write_text(fs::path(run_dir) / "config.toml", to_toml(cfg), error)) return nullptr;
+  return w;
+}
+
+void ResultsWriter::append(const EventRecord& rec) {
   events_.write(reinterpret_cast<const char*>(&rec), sizeof rec);
   ++totals_.programs;
   totals_.core_cycles += rec.core_cycles;
@@ -108,6 +143,17 @@ void ResultsWriter::on_record(const EventRecord& rec) {
     if (totals_.failure_dirs_written < cfg_.max_failure_dirs) write_failure_dir(rec);
   }
 }
+
+bool ResultsWriter::flush(std::string& error) {
+  events_.flush();
+  if (!events_) {
+    error = "cannot write " + dir_ + "/events.bin. Check free disk space.";
+    return false;
+  }
+  return true;
+}
+
+std::uint64_t ResultsWriter::events_bytes() { return static_cast<std::uint64_t>(events_.tellp()); }
 
 void ResultsWriter::write_failure_dir(const EventRecord& rec) {
   char name[48];
@@ -151,34 +197,46 @@ void ResultsWriter::write_failure_dir(const EventRecord& rec) {
   write_text(dir / "program.hex", hex.str(), ignored);
 }
 
-bool ResultsWriter::finish(const std::string& run_id, const Timing& timing, std::uint32_t workers, int exit_code,
-                           const std::string& stop_reason, std::string& error) {
-  events_.flush();
-  if (!events_) {
-    error = "cannot write " + dir_ + "/events.bin. Check free disk space.";
-    return false;
-  }
-  events_.close();
-
+bool ResultsWriter::write_summary(const SummaryInput& in, std::string& error) {
   std::ostringstream j;
+  auto num = [](double v) {
+    char buf[40];
+    std::snprintf(buf, sizeof buf, "%.9g", v);
+    return std::string(buf);
+  };
   j << "{\n"
-    << "  \"schema\": \"cutoff-summary-provisional-1\",\n"
-    << "  \"run\": {\"id\": \"" << json_escape(run_id) << "\", \"tool_version\": \"0.0.1\", \"git_commit\": \"" << CUTOFF_GIT_COMMIT
-    << "\", \"git_tree_dirty\": " << (CUTOFF_GIT_DIRTY != 0 ? "true" : "false") << ", \"config_hash\": \"" << hex64(config_hash(cfg_)) << "\"},\n"
+    << "  \"schema\": \"cutoff-summary-provisional-2\",\n"
+    << "  \"run\": {\"id\": \"" << json_escape(in.run_id) << "\", \"tool_version\": \"0.0.1\", \"git_commit\": \"" << CUTOFF_GIT_COMMIT
+    << "\", \"git_tree_dirty\": " << (CUTOFF_GIT_DIRTY != 0 ? "true" : "false") << ", \"config_hash\": \"" << hex64(config_hash(cfg_)) << "\", \"sessions\": " << in.sessions << "},\n"
     << "  \"environment\": {\"cpu\": \"" << json_escape(cpu_model()) << "\", \"logical_cores\": " << logical_cores()
     << ", \"verilator\": \"" << json_escape(verilator_version_string()) << "\", \"compiler\": \"" << json_escape(compiler_version()) << "\"},\n"
     << "  \"core\": {\"name\": \"" << cfg_.core_name << "\", \"commit\": \"" << CUTOFF_CORE_COMMIT << "\"},\n"
     << "  \"campaign\": {\"seed\": " << cfg_.seed << ", \"programs_requested\": " << cfg_.programs << ", \"programs_run\": " << totals_.programs
     << ", \"generator_version\": " << gen::kGeneratorVersion << ", \"profile\": \"g0\", \"checker\": \"" << cfg_.checker
-    << "\", \"stop_reason\": \"" << json_escape(stop_reason) << "\", \"exit_code\": " << exit_code << "},\n"
+    << "\", \"stop_reason\": \"" << json_escape(in.stop_reason) << "\", \"exit_code\": " << in.exit_code << "},\n"
+    << "  \"stop\": {\"rule_enabled\": " << (cfg_.stop.epsilon > 0 ? "true" : "false") << ", \"epsilon\": " << num(cfg_.stop.epsilon)
+    << ", \"confirm\": " << cfg_.stop.confirm << ", \"min_programs\": " << cfg_.stop.min_programs << ", \"checkpoint\": " << cfg_.stop.checkpoint
+    << ", \"estimator\": \"" << risk::estimator_name(cfg_.stop.estimator) << "\", \"risk_used\": " << num(in.risk_used)
+    << ", \"consecutive_checkpoints_below_epsilon\": " << in.stop_consecutive << ", \"programs_at_stop\": " << in.programs_at_stop
+    << ", \"fixed_budget\": " << cfg_.programs << ", \"plateau_window\": " << cfg_.stop.plateau_window
+    << ", \"plateau_rule_would_have_stopped_at\": " << (in.plateau_stop_at == 0 ? std::string("null") : std::to_string(in.plateau_stop_at)) << "},\n"
+    << "  \"risk\": {\"sets\": [";
+  for (std::size_t i = 0; i < in.sets.size(); ++i) {
+    const SetSummary& s = in.sets[i];
+    j << (i ? ", " : "") << "{\"name\": \"" << s.name << "\", \"universe\": " << s.universe << ", \"species_seen\": " << s.counts.s
+      << ", \"q1\": " << s.counts.q1 << ", \"q2\": " << s.counts.q2 << ", \"v\": " << s.counts.v << ", \"good_turing\": " << num(s.good_turing)
+      << ", \"incidence\": " << num(s.incidence) << ", \"coverage\": " << num(s.coverage) << ", \"chao2\": " << num(s.chao2)
+      << ", \"chao2_bias_corrected\": " << num(s.chao2_bias_corrected) << ", \"programs_since_new\": " << s.programs_since_new << "}";
+  }
+  j << "]},\n"
     << "  \"failures\": {\"count\": " << totals_.failures << ", \"failure_dirs_written\": " << totals_.failure_dirs_written << ", \"by_verdict\": {";
   for (std::size_t v = 1; v < totals_.by_verdict.size(); ++v)
     j << (v > 1 ? ", " : "") << "\"" << to_string(static_cast<Verdict>(v)) << "\": " << totals_.by_verdict[v];
   j << "}},\n"
     << "  \"totals\": {\"core_cycles\": " << totals_.core_cycles << ", \"model_instructions\": " << totals_.model_instructions << "},\n"
-    << "  \"workers\": " << workers << ",\n"
-    << "  \"timing\": {\"started_utc\": \"" << timing.started_utc << "\", \"wall_seconds\": " << timing.wall_seconds << ", \"programs_per_second\": "
-    << (timing.wall_seconds > 0 ? static_cast<double>(totals_.programs) / timing.wall_seconds : 0.0) << "}\n"
+    << "  \"workers\": " << in.workers << ",\n"
+    << "  \"timing\": {\"started_utc\": \"" << in.started_utc << "\", \"wall_seconds\": " << in.wall_seconds << ", \"programs_per_second\": "
+    << (in.wall_seconds > 0 ? static_cast<double>(totals_.programs) / in.wall_seconds : 0.0) << "}\n"
     << "}\n";
   return write_text(fs::path(dir_) / "summary.json", j.str(), error);
 }

@@ -30,6 +30,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(model)
 add_subdirectory(gen)
+add_subdirectory(risk)
 add_subdirectory(worker)
 add_subdirectory(engine)
 add_subdirectory(cli)

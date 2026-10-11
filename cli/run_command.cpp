@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <charconv>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -19,7 +20,14 @@ constexpr const char* kHelp =
     "  Runs random programs on the core and the reference model and checks them (checker C1).\n"
     "options:\n"
     "  --config FILE        settings file (default: ./cutoff.toml if it exists)\n"
-    "  --programs N         number of programs to run\n"
+    "  --max-programs N     program budget: run at most N programs (alias: --programs)\n"
+    "  --epsilon X          stop when the estimated risk of a new behaviour stays below X (0 = no stop rule)\n"
+    "  --confirm W          ... for W consecutive checkpoints (default 3)\n"
+    "  --min-programs N     never stop before N programs (default 1000)\n"
+    "  --checkpoint N       evaluate the risk and save a checkpoint every N programs (default 1000)\n"
+    "  --estimator NAME     good-turing (default), incidence or coverage\n"
+    "  --max-hours H        wall-clock budget across all sessions of the run\n"
+    "  --resume DIR         continue the run in results folder DIR from its checkpoint (e.g. after Ctrl-C, or with a larger budget)\n"
     "  --workers N          worker processes (default: one per hardware thread)\n"
     "  --seed N             campaign seed\n"
     "  --profile g0         generator profile\n"
@@ -28,7 +36,8 @@ constexpr const char* kHelp =
     "  --results-dir DIR    where result folders go (default: results)\n"
     "  --run-id ID          name of the result folder (default: run-<UTC time>-seed<seed>)\n"
     "  --progress | --no-progress   live progress line (default: only on a terminal)\n"
-    "exit codes: 0 no failures, 1 at least one failure, 3 setup or environment error\n";
+    "exit codes: 0 stopped at the threshold (or ran every program with the rule off) with no failure, 1 at least one failure,\n"
+    "            2 a budget ended before the threshold was reached, 3 setup or environment error, 130 interrupted (resumable)\n";
 
 bool is_number(const std::string& s) {
   std::uint64_t v = 0;
@@ -36,12 +45,18 @@ bool is_number(const std::string& s) {
   return !s.empty() && r.ec == std::errc() && r.ptr == s.data() + s.size();
 }
 
+bool parse_double(const std::string& s, double& out) {
+  char* end = nullptr;
+  out = std::strtod(s.c_str(), &end);
+  return !s.empty() && end == s.c_str() + s.size();
+}
+
 }  // namespace
 
 int run_command(const std::vector<std::string>& args, std::ostream& out, std::ostream& err) {
   using engine::TomlValue;
   engine::CampaignConfig cfg;
-  std::string config_path, run_id;
+  std::string config_path, run_id, resume_dir;
   int progress = -1;  // -1 = only if stderr is a terminal
   engine::TomlDoc overrides;
 
@@ -53,6 +68,18 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
     TomlValue t;
     t.type = TomlValue::Type::Int;
     t.i = static_cast<std::int64_t>(std::stoull(v));
+    overrides[key] = t;
+    return true;
+  };
+  auto set_float = [&](const std::string& key, const std::string& flag, const std::string& v) {
+    double d = 0;
+    if (!parse_double(v, d)) {
+      err << "cutoff: " << flag << " needs a number, not '" << v << "'. See `cutoff run --help`.\n";
+      return false;
+    }
+    TomlValue t;
+    t.type = TomlValue::Type::Float;
+    t.d = d;
     overrides[key] = t;
     return true;
   };
@@ -82,7 +109,14 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
     else if (a == "--results-dir") { if (!value(v)) return 3; set_str("output.dir", v); }
     else if (a == "--profile") { if (!value(v)) return 3; set_str("generator.profile", v); }
     else if (a == "--checker") { if (!value(v)) return 3; set_str("checker.level", v); }
-    else if (a == "--programs") { if (!value(v) || !set_int("campaign.programs", a, v)) return 3; }
+    else if (a == "--programs" || a == "--max-programs") { if (!value(v) || !set_int("campaign.programs", a, v)) return 3; }
+    else if (a == "--confirm") { if (!value(v) || !set_int("stop.confirm", a, v)) return 3; }
+    else if (a == "--min-programs") { if (!value(v) || !set_int("stop.min_programs", a, v)) return 3; }
+    else if (a == "--checkpoint") { if (!value(v) || !set_int("stop.checkpoint", a, v)) return 3; }
+    else if (a == "--epsilon") { if (!value(v) || !set_float("stop.epsilon", a, v)) return 3; }
+    else if (a == "--max-hours") { if (!value(v) || !set_float("stop.max_hours", a, v)) return 3; }
+    else if (a == "--estimator") { if (!value(v)) return 3; set_str("stop.estimator", v); }
+    else if (a == "--resume") { if (!value(resume_dir)) return 3; }
     else if (a == "--workers") { if (!value(v) || !set_int("campaign.workers", a, v)) return 3; }
     else if (a == "--seed") { if (!value(v) || !set_int("campaign.seed", a, v)) return 3; }
     else if (a == "--max-cycles") { if (!value(v) || !set_int("checker.max_cycles", a, v)) return 3; }
@@ -92,7 +126,19 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
     }
   }
 
-  if (config_path.empty() && std::filesystem::exists("cutoff.toml")) config_path = "cutoff.toml";
+  if (!resume_dir.empty()) {
+    if (!config_path.empty() || !run_id.empty()) {
+      err << "cutoff: --resume continues a saved run with its saved settings; do not combine it with --config or --run-id. Use options such as --max-programs to change settings.\n";
+      return 3;
+    }
+    config_path = (std::filesystem::path(resume_dir) / "config.toml").string();
+    if (!std::filesystem::exists(config_path)) {
+      err << "cutoff: '" << resume_dir << "' is not a Cutoff run folder (no config.toml). Pass the folder printed as 'results folder' by `cutoff run`.\n";
+      return 3;
+    }
+  } else if (config_path.empty() && std::filesystem::exists("cutoff.toml")) {
+    config_path = "cutoff.toml";
+  }
   if (!config_path.empty()) {
     std::ifstream f(config_path);
     if (!f) {
@@ -109,7 +155,7 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
 
   if (run_id.empty()) run_id = engine::default_run_id(cfg);
   const bool show = progress == 1 || (progress == -1 && isatty(STDERR_FILENO) != 0);
-  return engine::execute_run(cfg, run_id, show, out, err).exit_code;
+  return engine::execute_run(cfg, run_id, show, out, err, resume_dir).exit_code;
 }
 
 }  // namespace cutoff

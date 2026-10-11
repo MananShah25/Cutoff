@@ -1,6 +1,7 @@
 #include "campaign_config.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <functional>
 #include <sstream>
 #include <thread>
@@ -43,6 +44,20 @@ Setting uint_setting(const std::string& key, T CampaignConfig::*field, std::int6
           }};
 }
 
+Setting bool_setting(std::string key, const std::function<void(CampaignConfig&, bool)>& set) {
+  return {std::move(key), Type::Bool, [set](CampaignConfig& c, const TomlValue& v) { set(c, v.b); return std::string(); }};
+}
+
+Setting double_setting(const std::string& key, const std::function<void(CampaignConfig&, double)>& set) {
+  // NOLINTNEXTLINE(bugprone-exception-escape): reported for the lambda's implicit move; it only builds strings
+  return {key, Type::Float, [key, set](CampaignConfig& c, const TomlValue& v) -> std::string {
+            const double d = v.type == Type::Int ? static_cast<double>(v.i) : v.d;
+            if (!(d >= 0.0) || d > 1e12) return key + " must be a non-negative number (found " + std::to_string(d) + ")";
+            set(c, d);
+            return {};
+          }};
+}
+
 Setting string_setting(std::string key, std::string CampaignConfig::*field) {
   return {std::move(key), Type::String, [field](CampaignConfig& c, const TomlValue& v) { c.*field = v.s; return std::string(); }};
 }
@@ -70,9 +85,25 @@ const std::vector<Setting>& settings() {
       string_setting("checker.level", &CampaignConfig::checker),
       uint_setting("checker.max_cycles", &CampaignConfig::max_cycles, INT64_MAX),
       uint_setting("checker.max_instructions", &CampaignConfig::max_instructions, INT64_MAX),
+      bool_setting("species.op", [](CampaignConfig& c, bool b) { c.species.op = b; }),
+      bool_setting("species.cross", [](CampaignConfig& c, bool b) { c.species.cross = b; }),
+      double_setting("stop.epsilon", [](CampaignConfig& c, double d) { c.stop.epsilon = d; }),
+      {"stop.confirm", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("stop.confirm", v.i, 1, 1'000'000); if (e.empty()) c.stop.confirm = static_cast<std::uint32_t>(v.i); return e; }},
+      {"stop.min_programs", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("stop.min_programs", v.i, 0, INT64_MAX); if (e.empty()) c.stop.min_programs = static_cast<std::uint64_t>(v.i); return e; }},
+      {"stop.checkpoint", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("stop.checkpoint", v.i, 1, INT64_MAX); if (e.empty()) c.stop.checkpoint = static_cast<std::uint64_t>(v.i); return e; }},
+      {"stop.plateau_window", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("stop.plateau_window", v.i, 1, INT64_MAX); if (e.empty()) c.stop.plateau_window = static_cast<std::uint64_t>(v.i); return e; }},
+      {"stop.estimator", Type::String, [](CampaignConfig& c, const TomlValue& v) -> std::string {
+         if (v.s == "good-turing") c.stop.estimator = risk::Estimator::GoodTuring;
+         else if (v.s == "incidence") c.stop.estimator = risk::Estimator::IncidenceRate;
+         else if (v.s == "coverage") c.stop.estimator = risk::Estimator::CoverageRisk;
+         else return "stop.estimator must be \"good-turing\", \"incidence\" or \"coverage\" (found \"" + v.s + "\")";
+         return {};
+       }},
+      double_setting("stop.max_hours", [](CampaignConfig& c, double d) { c.max_hours = d; }),
       string_setting("output.dir", &CampaignConfig::results_dir),
       uint_setting("output.max_failure_dirs", &CampaignConfig::max_failure_dirs, 100000),
       uint_setting("debug.corrupt_core_every", &CampaignConfig::corrupt_core_every, 1'000'000'000),
+      uint_setting("debug.interrupt_after", &CampaignConfig::interrupt_after, INT64_MAX),
       {"debug.crash_worker_at", Type::Int, [](CampaignConfig& c, const TomlValue& v) { c.crash_worker_at = v.i; return std::string(); }},
   };
   return table;
@@ -135,6 +166,9 @@ std::string validate(const CampaignConfig& cfg) {
   if (cfg.max_cycles < 100) return "checker.max_cycles must be at least 100, otherwise every program is reported as a hang.";
   if (cfg.max_instructions < 1) return "checker.max_instructions must be at least 1.";
   if (cfg.results_dir.empty()) return "output.dir must not be empty.";
+  if (cfg.stop.epsilon >= 1.0 && cfg.stop.epsilon != 0.0) return "stop.epsilon is a risk in (0, 1); a value of 1 or more would stop immediately. Use 0 to switch the rule off.";
+  if (cfg.stop.epsilon > 0.0 && !cfg.species.any()) return "stop.epsilon > 0 needs at least one species set: set species.op or species.cross to true.";
+  if (cfg.stop.epsilon > 0.0 && cfg.stop.checkpoint > cfg.programs) return "stop.checkpoint is larger than campaign.programs, so the stop rule would never be evaluated. Lower stop.checkpoint.";
   return gen::validate(cfg.gen);
 }
 
@@ -146,8 +180,15 @@ std::string to_toml(const CampaignConfig& c) {
   os << "[generator]\nprofile = \"" << profile_name(c.gen.profile) << "\"\nmin_len = " << c.gen.min_len
      << "\nmax_len = " << c.gen.max_len << "\nmax_skip = " << c.gen.max_skip << "\n\n";
   os << "[checker]\nlevel = \"" << c.checker << "\"\nmax_cycles = " << c.max_cycles << "\nmax_instructions = " << c.max_instructions << "\n\n";
+  char eps[40], hours[40];
+  std::snprintf(eps, sizeof eps, "%.17g", c.stop.epsilon);
+  std::snprintf(hours, sizeof hours, "%.17g", c.max_hours);
+  os << "[species]\nop = " << (c.species.op ? "true" : "false") << "\ncross = " << (c.species.cross ? "true" : "false") << "\n\n";
+  os << "[stop]\nepsilon = " << eps << "\nconfirm = " << c.stop.confirm << "\nmin_programs = " << c.stop.min_programs
+     << "\ncheckpoint = " << c.stop.checkpoint << "\nestimator = \"" << risk::estimator_name(c.stop.estimator) << "\"\nplateau_window = "
+     << c.stop.plateau_window << "\nmax_hours = " << hours << "\n\n";
   os << "[output]\ndir = \"" << c.results_dir << "\"\nmax_failure_dirs = " << c.max_failure_dirs << "\n\n";
-  os << "[debug]\ncorrupt_core_every = " << c.corrupt_core_every << "\ncrash_worker_at = " << c.crash_worker_at << "\n";
+  os << "[debug]\ncorrupt_core_every = " << c.corrupt_core_every << "\ncrash_worker_at = " << c.crash_worker_at << "\ninterrupt_after = " << c.interrupt_after << "\n";
   return os.str();
 }
 
@@ -155,6 +196,23 @@ std::uint32_t resolved_workers(const CampaignConfig& cfg) {
   if (cfg.workers != 0) return cfg.workers;
   const unsigned n = std::thread::hardware_concurrency();
   return n == 0 ? 1 : n;
+}
+
+}  // namespace cutoff::engine
+
+namespace cutoff::engine {
+
+std::uint64_t stream_hash(const CampaignConfig& cfg) {
+  std::ostringstream os;
+  os << cfg.core_name << '|' << cfg.seed << '|' << static_cast<int>(cfg.gen.profile) << '|' << cfg.gen.min_len << '|' << cfg.gen.max_len
+     << '|' << cfg.gen.max_skip << '|' << cfg.checker << '|' << cfg.max_cycles << '|' << cfg.max_instructions << '|' << cfg.species.op
+     << cfg.species.cross << '|' << cfg.corrupt_core_every << '|' << gen::kGeneratorVersion;
+  std::uint64_t h = 0xcbf29ce484222325ULL;
+  for (const char ch : os.str()) {
+    h ^= static_cast<unsigned char>(ch);
+    h *= 0x100000001b3ULL;
+  }
+  return h;
 }
 
 }  // namespace cutoff::engine

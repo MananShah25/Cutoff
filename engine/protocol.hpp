@@ -6,6 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <vector>
+
+#include "species.hpp"
 
 namespace cutoff::engine {
 
@@ -44,6 +47,18 @@ struct EventRecord {
 };
 static_assert(sizeof(EventRecord) == 72);
 static_assert(std::is_trivially_copyable_v<EventRecord>);
+
+// What a worker sends back for one program: the compact record plus the species the program exercised.
+struct ProgramResult {
+  EventRecord rec;
+  risk::SpeciesIds species;
+};
+
+// Wire frame: EventRecord, then one little-endian u16 species count per set (kMaxSpeciesSets of them), then the ids of
+// each set in order. Only `rec` goes into events.bin; the species feed the estimators and are not stored.
+void encode_frame(const ProgramResult& r, std::vector<char>& out);
+// Decodes one frame from the front of `data`. Returns the bytes consumed, or 0 if `avail` holds only part of a frame.
+std::size_t decode_frame(const char* data, std::size_t avail, ProgramResult& out);
 
 // Orchestrator -> worker. count == 0 tells the worker to exit.
 struct Task {

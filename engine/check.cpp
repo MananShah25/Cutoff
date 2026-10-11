@@ -31,7 +31,9 @@ Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   Execution e;
   const std::uint64_t seed = gen::program_seed(cfg.seed, program_id);
   e.program = gen::generate(cfg.gen, seed);
-  e.model = run_model(e.program.code, {cfg.max_instructions, false});
+  const bool want_species = cfg.species.any();
+  e.model = run_model(e.program.code, {cfg.max_instructions, want_species});
+  if (want_species && e.model.status == Status::Exited) e.species = risk::extract_species(e.model.retired, cfg.species);
   e.core = run_program(e.program.code, {cfg.max_cycles});
 
   // Test hook (debug.corrupt_core_every): fake a core bug so the failure path can be exercised end to end.
@@ -39,8 +41,10 @@ Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   return e;
 }
 
-EventRecord evaluate_program(const CampaignConfig& cfg, std::uint64_t program_id) {
-  const Execution e = execute_program(cfg, program_id);
+EventRecord evaluate_program(const CampaignConfig& cfg, std::uint64_t program_id) { return evaluate(cfg, program_id).rec; }
+
+ProgramResult evaluate(const CampaignConfig& cfg, std::uint64_t program_id) {
+  Execution e = execute_program(cfg, program_id);
   const ModelResult& model = e.model;
   const RunResult& core = e.core;
   const CheckOutcome outcome = check_c1(model, core);
@@ -59,7 +63,10 @@ EventRecord evaluate_program(const CampaignConfig& cfg, std::uint64_t program_id
   rec.core_status = static_cast<std::uint8_t>(core.status);
   rec.verdict = static_cast<std::uint8_t>(outcome.verdict);
   rec.detail = outcome.detail;
-  return rec;
+  ProgramResult result;
+  result.rec = rec;
+  result.species = std::move(e.species);
+  return result;
 }
 
 }  // namespace cutoff::engine
