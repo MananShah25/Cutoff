@@ -7,3 +7,6 @@ Checks: >
   modernize-use-nullptr,
   modernize-use-override
 WarningsAsErrors: ''
+CheckOptions:
+  # Positive literals as shift counts / masks (`x >> 7`) are not the signed-operand hazard this check targets.
+  bugprone-signed-bitwise.IgnorePositiveIntegerLiterals: true

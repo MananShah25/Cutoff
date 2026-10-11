@@ -33,16 +33,6 @@ void mix(std::uint64_t& h, std::uint64_t v) {
 
 }  // namespace
 
-const char* to_string(Status s) {
-  switch (s) {
-    case Status::Exited: return "exited";
-    case Status::Trap: return "trap";
-    case Status::Timeout: return "timeout";
-    case Status::MemFault: return "memfault";
-  }
-  return "?";
-}
-
 void set_runtime_random_reset(int mode, unsigned seed) {
   Verilated::randReset(mode);
   Verilated::randSeed(static_cast<int>(seed));
@@ -65,6 +55,9 @@ RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg)
   top->mem_rdata = 0;
 
   bool done = false;
+  bool pending = false;  // a bus event ended the run; waiting out the trap window
+  Status pending_status = Status::Timeout;
+  unsigned settle_left = 0;
   for (std::uint64_t cycle = 0; !done; ++cycle) {
     if (cycle >= cfg.max_cycles) {
       res.status = Status::Timeout;
@@ -76,17 +69,17 @@ RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg)
     // showed before this clock edge and drives ready/rdata for the next one.
     bool next_ready = false;
     std::uint32_t next_rdata = top->mem_rdata;
-    if (top->resetn && top->mem_valid && !top->mem_ready) {
+    if (!pending && top->resetn && top->mem_valid && !top->mem_ready) {
       const std::uint32_t addr = top->mem_addr & ~3u;
       const std::uint8_t wstrb = top->mem_wstrb;
       const bool is_write = wstrb != 0;
       if (is_write && addr == kMagicAddr) {
-        res.status = Status::Exited;
+        pending = true;
+        pending_status = Status::Exited;
         res.exit_code = top->mem_wdata;
-        done = true;
       } else if (addr + 3 >= kRamBytes) {
-        res.status = Status::MemFault;
-        done = true;
+        pending = true;
+        pending_status = Status::MemFault;
       } else {
         next_rdata = 0;
         for (unsigned b = 0; b < 4; ++b) next_rdata |= static_cast<std::uint32_t>(ram[addr + b]) << (8 * b);
@@ -95,6 +88,7 @@ RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg)
             if ((wstrb & (1u << b)) != 0) ram[addr + b] = static_cast<std::uint8_t>(top->mem_wdata >> (8 * b));
         next_ready = true;
       }
+      if (pending) settle_left = cfg.trap_settle_cycles;
       mix(res.trace_hash, cycle);
       mix(res.trace_hash, (static_cast<std::uint64_t>(top->mem_instr) << 4U) | wstrb);
       mix(res.trace_hash, top->mem_addr);
@@ -110,9 +104,16 @@ RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg)
     top->mem_rdata = next_rdata;
     res.cycles = cycle + 1;
 
-    if (!done && top->resetn && top->trap) {
+    if (top->resetn && top->trap) {  // a trap preempts a pending bus event
       res.status = Status::Trap;
       done = true;
+    } else if (pending) {
+      if (settle_left == 0) {
+        res.status = pending_status;
+        done = true;
+      } else {
+        --settle_left;
+      }
     }
   }
 

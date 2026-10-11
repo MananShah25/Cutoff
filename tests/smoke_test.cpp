@@ -65,3 +65,27 @@ TEST(Smoke, RandomResetRequestDoesNotChangeTrace) {
   EXPECT_EQ(base.cycles, randomized.cycles);
   EXPECT_EQ(base.regs, randomized.regs);
 }
+
+// The core raises a bus request before its trap output for a misaligned fetch or store, so a run that
+// ends on a bus event must wait briefly for a trap (RunConfig::trap_settle_cycles). Measured on 2026-10-10:
+// jal to 0xfffffffe reports MemFault with no wait and Trap from one cycle on.
+TEST(Smoke, TrapPreemptsABusEventEndingTheRun) {
+  const std::array<std::uint32_t, 1> jal_misaligned{0xfffff2ef};  // jal x5, -2
+  RunConfig no_wait;
+  no_wait.trap_settle_cycles = 0;
+  EXPECT_EQ(run_program(jal_misaligned, no_wait).status, Status::MemFault);
+  RunConfig one_cycle;
+  one_cycle.trap_settle_cycles = 1;
+  EXPECT_EQ(run_program(jal_misaligned, one_cycle).status, Status::Trap);
+  EXPECT_EQ(run_program(jal_misaligned).status, Status::Trap);
+}
+
+TEST(Smoke, LongSettleWindowDoesNotTurnALegitimateExitIntoATrap) {
+  // sw to the magic address is followed by an all-zero (illegal) word. The testbench stops answering the core
+  // once the store is seen, so the core never reaches that word however long the window is.
+  RunConfig cfg;
+  cfg.trap_settle_cycles = 64;
+  const RunResult r = run_program(smoke::kAdd, cfg);
+  EXPECT_EQ(r.status, Status::Exited);
+  EXPECT_EQ(r.exit_code, 12u);
+}

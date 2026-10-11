@@ -6,16 +6,17 @@
 #include <span>
 #include <string>
 
-namespace cutoff {
+#include "memory_map.hpp"
 
-inline constexpr std::uint32_t kRamBytes = 64 * 1024;
-inline constexpr std::uint32_t kMagicAddr = 0x1000'0000;  // a store here ends the program
+namespace cutoff {
 
 struct RunConfig {
   std::uint64_t max_cycles = 100'000;
+  // The core raises a bus request one or two cycles before its `trap` output when the access or fetch is
+  // misaligned, so a run that ends on a bus event (magic store, out-of-range access) keeps clocking for this
+  // many cycles and reports Trap if the core traps meanwhile. Measured in tests/model_vs_core_test.cpp.
+  unsigned trap_settle_cycles = 4;
 };
-
-enum class Status : std::uint8_t { Exited, Trap, Timeout, MemFault };
 
 struct RunResult {
   Status status = Status::Timeout;
@@ -24,8 +25,6 @@ struct RunResult {
   std::uint64_t trace_hash = 0;  // FNV-1a over every accepted bus transfer
   std::array<std::uint32_t, 32> regs{};
 };
-
-const char* to_string(Status s);
 
 // Runs `code` (loaded at address 0, the core's reset address) to completion.
 RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg = {});

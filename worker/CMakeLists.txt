@@ -1,5 +1,6 @@
 add_library(cutoff_sim STATIC sim_core.cpp)
 target_include_directories(cutoff_sim PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(cutoff_sim PUBLIC cutoff_model)
 
 set(CUTOFF_RTL ${PROJECT_SOURCE_DIR}/rtl)
 verilate(cutoff_sim

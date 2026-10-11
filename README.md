@@ -6,8 +6,8 @@ because none have been measured.
 
 ## Status
 
-Step 1 of 12 (foundations): the pinned PicoRV32 core builds under Verilator, a hand-assembled smoke program runs on it
-deterministically, and `cutoff doctor` checks the environment. Nothing else is implemented.
+Step 2 of 12 (reference model): the RV32I model, decoder and encoder exist, tested against hand-computed vectors and
+against the Verilated PicoRV32 on a directed set of corner-case programs. No generator, checker, estimator or report yet.
 
 ## Build (macOS)
 
@@ -27,6 +27,7 @@ Static analysis: `scripts/tidy.sh build/debug`.
 | Path | Purpose |
 | --- | --- |
 | `cli/` | The `cutoff` command |
+| `model/` | RV32I decoder, encoder and reference model |
 | `worker/` | Verilated core and memory model |
 | `rtl/` | `cutoff_core.v` wrapper; `picorv32/` is the pinned submodule |
 | `tests/` | GoogleTest unit tests |
