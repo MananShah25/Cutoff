@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <functional>
+
+#include "sim_drill.hpp"
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -65,6 +67,7 @@ Setting string_setting(std::string key, std::string CampaignConfig::*field) {
 const std::vector<Setting>& settings() {
   static const std::vector<Setting> table = {
       string_setting("core.name", &CampaignConfig::core_name),
+      {"core.mutant", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("core.mutant", v.i, -1, 65535); if (e.empty()) c.mutant = v.i; return e; }},
       uint_setting("campaign.seed", &CampaignConfig::seed, INT64_MAX),
       uint_setting("campaign.programs", &CampaignConfig::programs, 1'000'000'000'000LL),
       uint_setting("campaign.workers", &CampaignConfig::workers, 1024),
@@ -160,6 +163,7 @@ std::string apply_toml(CampaignConfig& cfg, const TomlDoc& doc, const std::strin
 
 std::string validate(const CampaignConfig& cfg) {
   if (cfg.core_name != "picorv32") return "core.name \"" + cfg.core_name + "\" is not supported; only \"picorv32\" exists so far.";
+  if (cfg.mutant > drill_mutant_count()) return "core.mutant " + std::to_string(cfg.mutant) + " does not exist: this build has mutants 1 to " + std::to_string(drill_mutant_count()) + " (list them with `cutoff build --drill --list`).";
   if (cfg.programs < 1) return "campaign.programs must be at least 1.";
   if (cfg.batch_size < 1) return "campaign.batch_size must be at least 1.";
   if (cfg.checker != "c1") return "checker.level \"" + cfg.checker + "\" is not available yet: only \"c1\" exists until Step 8 adds c2 and c3.";
@@ -174,7 +178,7 @@ std::string validate(const CampaignConfig& cfg) {
 
 std::string to_toml(const CampaignConfig& c) {
   std::ostringstream os;
-  os << "[core]\nname = \"" << c.core_name << "\"\n\n";
+  os << "[core]\nname = \"" << c.core_name << "\"\nmutant = " << c.mutant << "\n\n";
   os << "[campaign]\nseed = " << c.seed << "\nprograms = " << c.programs << "\nworkers = " << c.workers
      << "\nbatch_size = " << c.batch_size << "\n\n";
   os << "[generator]\nprofile = \"" << profile_name(c.gen.profile) << "\"\nmin_len = " << c.gen.min_len
@@ -204,7 +208,7 @@ namespace cutoff::engine {
 
 std::uint64_t stream_hash(const CampaignConfig& cfg) {
   std::ostringstream os;
-  os << cfg.core_name << '|' << cfg.seed << '|' << static_cast<int>(cfg.gen.profile) << '|' << cfg.gen.min_len << '|' << cfg.gen.max_len
+  os << cfg.core_name << '|' << cfg.mutant << '|' << cfg.seed << '|' << static_cast<int>(cfg.gen.profile) << '|' << cfg.gen.min_len << '|' << cfg.gen.max_len
      << '|' << cfg.gen.max_skip << '|' << cfg.checker << '|' << cfg.max_cycles << '|' << cfg.max_instructions << '|' << cfg.species.op
      << cfg.species.cross << '|' << cfg.corrupt_core_every << '|' << gen::kGeneratorVersion;
   std::uint64_t h = 0xcbf29ce484222325ULL;

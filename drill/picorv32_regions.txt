@@ -1,0 +1,53 @@
+# Mutation regions for PicoRV32 (YosysHQ/picorv32 ef203c2b0a3f, file picorv32.v, module picorv32).
+# Line numbers refer to that exact file; each region's first line must contain its anchor text or generation fails.
+# Categories follow the spec's list: ALU, comparators, branch-condition logic, immediate decode, register-file write
+# enable and x0 handling, memory address and strobe logic, PC update (plus the serial shifter, which is the ALU's shift unit
+# in this configuration, and the branch funct3 decode).
+# Logic that is dead for the RV32I configuration (compressed decoder, IRQ, counters, PCPI, barrel shifter, two-cycle
+# ALU/compare) is pruned automatically from the parameter values of rtl/cutoff_core.v and is not listed here.
+
+module picorv32
+
+# ---- ALU
+region alu        1240 1240 "alu_add_sub = instr_sub"
+region alu        1275 1279 "alu_out = reg_op1 ^ reg_op2"
+region shift      1831 1850 "if (reg_sh == 0)"
+
+# ---- comparators
+region compare    1241 1243 "alu_eq = reg_op1 == reg_op2"
+
+# ---- branch-condition logic and branch/jump flow
+region branch     1254 1264 "alu_out_0 = alu_eq"
+region branch     1811 1822 "if (is_beq_bne_blt_bge_bltu_bgeu)"
+region decode     1040 1045 "instr_beq   <= is_beq_bne_blt_bge_bltu_bgeu" ops=const,eq,logic
+
+# ---- immediate decode
+region imm        880  880  "decoded_imm_j[31:20]"
+region imm        1122 1133 "decoded_imm <= decoded_imm_j"
+
+# ---- register-file write enable, x0 handling, link value
+region regfile    1317 1322 "cpuregs_wrdata = reg_pc"
+region regfile    1338 1338 "if (resetn && cpuregs_write && latched_rd)"
+region regfile    1352 1353 "cpuregs_rs1 = decoded_rs1"
+
+# ---- memory address and strobe logic, load data path
+region memory     382  382  "assign mem_la_addr"
+region memory     405  419  "mem_la_wdata = reg_op2"
+region memory     575  579  "mem_addr <= mem_la_addr"
+region memory     1869 1869 "reg_op1 <= reg_op1 + decoded_imm"
+region memory     1897 1897 "reg_op1 <= reg_op1 + decoded_imm"
+region memory     1903 1905 "latched_is_lu: reg_out <= mem_rdata_word"
+
+# ---- PC update
+region pc         1213 1213 "assign next_pc"
+region pc         1500 1500 "current_pc = latched_store"
+region pc         1552 1552 "reg_next_pc <= current_pc"
+region pc         1560 1560 "reg_next_pc <= current_pc"
+region pc         1569 1569 "reg_next_pc <= current_pc + decoded_imm_j"
+region pc         1806 1806 "reg_out <= reg_pc + decoded_imm"
+
+# ---- stuck-at bits on selected signals (applied to every assignment of the signal inside the regions above)
+stuck alu_add_sub    32 0,31
+stuck cpuregs_wrdata 32 0,31
+stuck mem_la_wstrb    4 0,3
+stuck decoded_imm    32 0,31

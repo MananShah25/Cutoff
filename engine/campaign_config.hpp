@@ -15,6 +15,9 @@ namespace cutoff::engine {
 struct CampaignConfig {
   // [core]
   std::string core_name = "picorv32";
+  // -1: the original core. 0: the instrumented core with no mutation selected (must behave exactly like the original).
+  // N >= 1: the instrumented core with mutant N selected (see `cutoff build --drill --list`).
+  std::int64_t mutant = -1;
   // [campaign]
   std::uint64_t seed = 1;
   std::uint64_t programs = 1000;      // budget: at most this many programs (ids 0 .. programs-1)

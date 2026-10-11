@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "build_command.hpp"
 #include "doctor.hpp"
 #include "run_command.hpp"
 
@@ -16,7 +17,8 @@ void usage() {
       "usage: cutoff <command>\n"
       "commands available now:\n"
       "  doctor    check Verilator, compiler, cores and disk space\n"
-      "  run       run random programs on the core and check them (see `cutoff run --help`)\n",
+      "  run       run random programs on the core and check them (see `cutoff run --help`)\n"
+      "  build     report the built-in cores; `build --drill [--list]` describes the instrumented core\n",
       stderr);
 }
 
@@ -31,6 +33,7 @@ int dispatch(int argc, char** argv) {
   }
   const std::string_view cmd = argv[1];
   if (cmd == "doctor") return cutoff::doctor_main();
+  if (cmd == "build") return cutoff::build_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
   if (cmd == "run") return cutoff::run_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
   std::fprintf(stderr, "cutoff: unknown or not-yet-implemented command '%s'\n\n", argv[1]);
   usage();

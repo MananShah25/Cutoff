@@ -4,6 +4,7 @@
 
 [core]
 name = "picorv32"
+mutant = -1            # -1 = the original core; 0 = instrumented core, nothing mutated; N = mutant N (cutoff build --drill --list)
 
 [campaign]
 seed = 1

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "generator.hpp"
+#include "sim_drill.hpp"
 
 namespace cutoff::engine {
 
@@ -34,7 +35,8 @@ Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   const bool want_species = cfg.species.any();
   e.model = run_model(e.program.code, {cfg.max_instructions, want_species});
   if (want_species && e.model.status == Status::Exited) e.species = risk::extract_species(e.model.retired, cfg.species);
-  e.core = run_program(e.program.code, {cfg.max_cycles});
+  e.core = cfg.mutant < 0 ? run_program(e.program.code, {cfg.max_cycles})
+                          : run_program_mutant(e.program.code, static_cast<std::uint32_t>(cfg.mutant), {cfg.max_cycles});
 
   // Test hook (debug.corrupt_core_every): fake a core bug so the failure path can be exercised end to end.
   if (cfg.corrupt_core_every != 0 && (program_id + 1) % cfg.corrupt_core_every == 0) e.core.regs[5] ^= 1u;

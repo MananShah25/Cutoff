@@ -30,6 +30,7 @@ constexpr const char* kHelp =
     "  --resume DIR         continue the run in results folder DIR from its checkpoint (e.g. after Ctrl-C, or with a larger budget)\n"
     "  --workers N          worker processes (default: one per hardware thread)\n"
     "  --seed N             campaign seed\n"
+    "  --mutant N           run the instrumented core with mutant N selected (0 = instrumented but unmutated)\n"
     "  --profile g0         generator profile\n"
     "  --checker c1         checker level\n"
     "  --max-cycles N       core cycle limit per program (hitting it is a hang)\n"
@@ -118,6 +119,7 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
     else if (a == "--estimator") { if (!value(v)) return 3; set_str("stop.estimator", v); }
     else if (a == "--resume") { if (!value(resume_dir)) return 3; }
     else if (a == "--workers") { if (!value(v) || !set_int("campaign.workers", a, v)) return 3; }
+    else if (a == "--mutant") { if (!value(v) || !set_int("core.mutant", a, v)) return 3; }
     else if (a == "--seed") { if (!value(v) || !set_int("campaign.seed", a, v)) return 3; }
     else if (a == "--max-cycles") { if (!value(v) || !set_int("checker.max_cycles", a, v)) return 3; }
     else {
