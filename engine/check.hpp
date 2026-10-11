@@ -21,6 +21,7 @@ struct CheckOutcome {
 // Precedence: a model that did not exit cleanly is a GeneratorFault (nothing can be concluded about the core);
 // then a core Timeout is a Hang; then status, exit code, registers, memory.
 CheckOutcome check_c1(const ModelResult& model, const RunResult& core);
+CheckOutcome check_c2(const ModelResult& model, const RunResult& core);
 
 // Everything one program produces; failure reports need the full results, not just the compact record.
 struct Execution {

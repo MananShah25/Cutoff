@@ -78,6 +78,7 @@ RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cf
         if (is_write)
           for (unsigned b = 0; b < 4; ++b)
             if ((wstrb & (1u << b)) != 0) ram[addr + b] = static_cast<std::uint8_t>(top->mem_wdata >> (8 * b));
+        if (is_write) res.stores.push_back({addr, top->mem_wdata, wstrb});
         next_ready = true;
       }
       if (pending) settle_left = cfg.trap_settle_cycles;

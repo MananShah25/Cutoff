@@ -313,7 +313,8 @@ RunOutcome execute_run(const CampaignConfig& cfg_in, const std::string& run_id_i
   const double session_seconds = outcome.wall_seconds - elapsed_before;
   std::snprintf(rate, sizeof rate, "%.0f", session_seconds > 0 ? static_cast<double>(status.next_id - first_id) / session_seconds : 0.0);
   const Totals& t = writer->totals();
-  out << "programs run:   " << outcome.programs << " (seed " << cfg.seed << ", generator g0 v" << gen::kGeneratorVersion << ", checker " << cfg.checker << ")\n";
+  const char* profile = cfg.gen.profile == gen::Profile::G0 ? "g0" : cfg.gen.profile == gen::Profile::G1 ? "g1" : cfg.gen.profile == gen::Profile::G2 ? "g2" : "g3";
+  out << "programs run:   " << outcome.programs << " (seed " << cfg.seed << ", generator " << profile << " v" << gen::kGeneratorVersion << ", checker " << cfg.checker << ")\n";
   char risk_text[64];
   std::snprintf(risk_text, sizeof risk_text, "%.4g", in.risk_used);
   if (outcome.stop_reason == "threshold")

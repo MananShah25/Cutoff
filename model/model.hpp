@@ -37,13 +37,6 @@ struct RetireRecord {
   std::uint32_t rs2_value = 0;  // likewise for rs2
 };
 
-// One store as the core's bus shows it: word address, replicated data word, byte strobes.
-// The terminating magic store is not recorded (its data is the exit code).
-struct StoreRecord {
-  std::uint32_t addr = 0, data = 0;
-  std::uint8_t strobe = 0;
-};
-
 struct ModelResult {
   Status status = Status::Running;
   std::uint32_t exit_code = 0;

@@ -28,6 +28,16 @@ std::string hex32(std::uint32_t v) {
   return buf;
 }
 
+const char* profile_name(gen::Profile p) {
+  switch (p) {
+    case gen::Profile::G0: return "g0";
+    case gen::Profile::G1: return "g1";
+    case gen::Profile::G2: return "g2";
+    case gen::Profile::G3: return "g3";
+  }
+  return "?";
+}
+
 std::string json_escape(const std::string& s) {
   std::string out;
   for (const char c : s) {
@@ -170,7 +180,7 @@ void ResultsWriter::write_failure_dir(const EventRecord& rec) {
   t << "program id:        " << rec.program_id << "\n"
     << "program seed:      " << hex64(rec.seed) << "\n"
     << "campaign seed:     " << cfg_.seed << "\n"
-    << "generator:         version " << gen::kGeneratorVersion << ", profile g0, body length " << (e.program.body_end - e.program.body_begin)
+    << "generator:         version " << gen::kGeneratorVersion << ", profile " << profile_name(cfg_.gen.profile) << ", body length " << (e.program.body_end - e.program.body_begin)
     << " words (min_len " << cfg_.gen.min_len << ", max_len " << cfg_.gen.max_len << ", max_skip " << cfg_.gen.max_skip << ")\n"
     << "verdict:           " << to_string(static_cast<Verdict>(rec.verdict));
   if (rec.verdict == static_cast<std::uint8_t>(Verdict::RegMismatch)) t << " (first differing register: x" << int(rec.detail) << ")";
@@ -214,7 +224,7 @@ bool ResultsWriter::write_summary(const SummaryInput& in, std::string& error) {
     << ", \"verilator\": \"" << json_escape(verilator_version_string()) << "\", \"compiler\": \"" << json_escape(compiler_version()) << "\"},\n"
     << "  \"core\": {\"name\": \"" << cfg_.core_name << "\", \"commit\": \"" << CUTOFF_CORE_COMMIT << "\"},\n"
     << "  \"campaign\": {\"seed\": " << cfg_.seed << ", \"programs_requested\": " << cfg_.programs << ", \"programs_run\": " << totals_.programs
-    << ", \"generator_version\": " << gen::kGeneratorVersion << ", \"profile\": \"g0\", \"checker\": \"" << cfg_.checker
+    << ", \"generator_version\": " << gen::kGeneratorVersion << ", \"profile\": \"" << profile_name(cfg_.gen.profile) << "\", \"checker\": \"" << cfg_.checker
     << "\", \"stop_reason\": \"" << json_escape(in.stop_reason) << "\", \"exit_code\": " << in.exit_code << "},\n"
     << "  \"stop\": {\"rule_enabled\": " << (cfg_.stop.epsilon > 0 ? "true" : "false") << ", \"epsilon\": " << num(cfg_.stop.epsilon)
     << ", \"confirm\": " << cfg_.stop.confirm << ", \"min_programs\": " << cfg_.stop.min_programs << ", \"checkpoint\": " << cfg_.stop.checkpoint

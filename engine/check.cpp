@@ -29,12 +29,20 @@ CheckOutcome check_c1(const ModelResult& model, const RunResult& core) {
   return {};
 }
 
+CheckOutcome check_c2(const ModelResult& model, const RunResult& core) {
+  if (const CheckOutcome base = check_c1(model, core); base.verdict != Verdict::Pass) return base;
+  if (model.stores.size() != core.stores.size()) return {Verdict::StoreMismatch, 0};
+  for (std::size_t i = 0; i < model.stores.size(); ++i)
+    if (!(model.stores[i] == core.stores[i])) return {Verdict::StoreMismatch, 0};
+  return {};
+}
+
 Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   Execution e;
   const std::uint64_t seed = gen::program_seed(cfg.seed, program_id);
   e.program = gen::generate(cfg.gen, seed);
   const bool want_species = cfg.species.any();
-  e.model = run_model(e.program.code, {cfg.max_instructions, want_species});
+  e.model = run_model(e.program.code, {cfg.max_instructions, want_species || cfg.checker != "c1"});
   if (want_species && e.model.status == Status::Exited) e.species = risk::extract_species(e.model.retired, cfg.species);
   if (cfg.drill) {  // the golden run of a drill is the infect model, which behaves exactly like the original core
     InfectedRun g = run_program_infected(e.program.code, {cfg.max_cycles});
@@ -77,7 +85,7 @@ ProgramResult evaluate(const CampaignConfig& cfg, std::uint64_t program_id) {
   Execution e = execute_program(cfg, program_id);
   const ModelResult& model = e.model;
   const RunResult& core = e.core;
-  const CheckOutcome outcome = check_c1(model, core);
+  const CheckOutcome outcome = cfg.checker == "c2" ? check_c2(model, core) : check_c1(model, core);
   EventRecord rec;
   rec.program_id = program_id;
   rec.seed = e.program.seed;

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <span>
+#include <vector>
 
 namespace cutoff {
 
@@ -16,6 +17,13 @@ enum class Status : std::uint8_t {
   Trap,      // illegal instruction, misaligned access or misaligned jump target
   Timeout,   // instruction or cycle limit reached
   MemFault,  // access outside RAM that is not the magic store
+};
+
+// A non-terminating memory write as seen on PicoRV32's native interface.
+struct StoreRecord {
+  std::uint32_t addr = 0, data = 0;
+  std::uint8_t strobe = 0;
+  friend bool operator==(const StoreRecord&, const StoreRecord&) = default;
 };
 
 constexpr const char* to_string(Status s) {

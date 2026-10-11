@@ -164,7 +164,8 @@ TEST(CampaignConfigTest, ValidationSaysWhatToChange) {
     return validate(c);
   };
   EXPECT_NE(msg([](CampaignConfig& c) { c.programs = 0; }).find("programs"), std::string::npos);
-  EXPECT_NE(msg([](CampaignConfig& c) { c.checker = "c2"; }).find("Step 8"), std::string::npos);
+  EXPECT_EQ(msg([](CampaignConfig& c) { c.checker = "c2"; }), "");
+  EXPECT_NE(msg([](CampaignConfig& c) { c.checker = "c3"; }).find("c3"), std::string::npos);
   EXPECT_NE(msg([](CampaignConfig& c) { c.max_cycles = 10; }).find("max_cycles"), std::string::npos);
   EXPECT_NE(msg([](CampaignConfig& c) { c.gen.max_len = 1; c.gen.min_len = 5; }).find("max_len"), std::string::npos);
   EXPECT_NE(msg([](CampaignConfig& c) { c.core_name = "ibex"; }).find("picorv32"), std::string::npos);
@@ -240,6 +241,20 @@ TEST(CheckC1, VerdictsAndPrecedence) {
   m.status = Status::Timeout;
   c = matching_core(good_model());
   EXPECT_EQ(check_c1(m, c).verdict, Verdict::GeneratorFault);
+}
+
+TEST(CheckC2, ComparesOrderedStoreTraceAfterC1) {
+  ModelResult m = good_model();
+  m.stores = {{0x8000, 0x11223344, 0xf}, {0x8004, 0xaaaaaaaa, 0x3}};
+  RunResult c = matching_core(m);
+  c.stores = m.stores;
+  EXPECT_EQ(check_c2(m, c).verdict, Verdict::Pass);
+  std::swap(c.stores[0], c.stores[1]);
+  EXPECT_EQ(check_c2(m, c).verdict, Verdict::StoreMismatch);
+  c = matching_core(m);
+  c.stores = m.stores;
+  c.regs[1] ^= 1;
+  EXPECT_EQ(check_c2(m, c).verdict, Verdict::RegMismatch) << "C1 failures take precedence";
 }
 
 TEST(CheckC1, X0IsNeverCompared) {
@@ -555,7 +570,7 @@ TEST(RunCommand, ParsesOptionsAndReportsMistakesClearly) {
   EXPECT_NE(err.find("needs a value"), std::string::npos);
   EXPECT_EQ(run({"--programs", "lots"}, &out, &err), 3);
   EXPECT_NE(err.find("whole number"), std::string::npos);
-  EXPECT_EQ(run({"--checker", "c2", "--results-dir", tmp.str()}, &out, &err), 3);
+  EXPECT_EQ(run({"--checker", "c3", "--results-dir", tmp.str()}, &out, &err), 3);
   EXPECT_NE(err.find("Step 8"), std::string::npos);
   EXPECT_EQ(run({"--config", tmp.str() + "/missing.toml"}, &out, &err), 3);
   EXPECT_NE(err.find("cannot read config file"), std::string::npos);

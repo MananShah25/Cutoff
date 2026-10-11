@@ -172,7 +172,7 @@ std::string validate(const CampaignConfig& cfg) {
   if (cfg.drill && cfg.mutant >= 0) return "a drill runs its own mutants: leave core.mutant at -1 (or use `cutoff run --mutant N` for a single planted bug).";
   if (cfg.programs < 1) return "campaign.programs must be at least 1.";
   if (cfg.batch_size < 1) return "campaign.batch_size must be at least 1.";
-  if (cfg.checker != "c1") return "checker.level \"" + cfg.checker + "\" is not available yet: only \"c1\" exists until Step 8 adds c2 and c3.";
+  if (cfg.checker != "c1" && cfg.checker != "c2") return "checker.level \"" + cfg.checker + "\" is not available yet: use \"c1\" or \"c2\"; c3 arrives later in Step 8.";
   if (cfg.max_cycles < 100) return "checker.max_cycles must be at least 100, otherwise every program is reported as a hang.";
   if (cfg.max_instructions < 1) return "checker.max_instructions must be at least 1.";
   if (cfg.results_dir.empty()) return "output.dir must not be empty.";

@@ -18,6 +18,7 @@ const char* to_string(Verdict v) {
     case Verdict::ExitCodeMismatch: return "exit-code-mismatch";
     case Verdict::RegMismatch: return "register-mismatch";
     case Verdict::MemMismatch: return "memory-mismatch";
+    case Verdict::StoreMismatch: return "store-mismatch";
   }
   return "?";
 }
