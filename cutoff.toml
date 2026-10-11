@@ -1,0 +1,31 @@
+# Cutoff settings. Every key is optional; the values shown are the defaults.
+# `cutoff run` reads ./cutoff.toml automatically; command-line options override this file.
+# The fully resolved settings of each run are copied to results/<run-id>/config.toml.
+
+[core]
+name = "picorv32"
+
+[campaign]
+seed = 1
+programs = 1000
+workers = 0            # 0 = one worker process per hardware thread
+batch_size = 64        # programs handed to a worker at a time
+
+[generator]
+profile = "g0"
+min_len = 32           # body length is drawn uniformly from [min_len, max_len]
+max_len = 128
+max_skip = 8           # forward jumps prefer targets at most this many instructions ahead
+
+[checker]
+level = "c1"           # c1 = final registers + memory hash (c2, c3 arrive in a later step)
+max_cycles = 200000    # core cycle limit per program; hitting it is reported as a hang
+max_instructions = 100000
+
+[output]
+dir = "results"
+max_failure_dirs = 20  # failure folders written per run (all failures are still counted)
+
+[debug]                # test hooks; leave at their defaults
+corrupt_core_every = 0
+crash_worker_at = -1

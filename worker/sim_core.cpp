@@ -117,6 +117,7 @@ RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg)
     }
   }
 
+  res.mem_hash = hash_ram(ram);
   for (std::size_t i = 1; i < 32; ++i) res.regs[i] = top->rootp->cutoff_core__DOT__cpu__DOT__cpuregs[i];
   top->final();
   return res;
