@@ -6,8 +6,9 @@ because none have been measured.
 
 ## Status
 
-Step 2 of 12 (reference model): the RV32I model, decoder and encoder exist, tested against hand-computed vectors and
-against the Verilated PicoRV32 on a directed set of corner-case programs. No generator, checker, estimator or report yet.
+Step 3 of 12 (generator G0): seeded, reproducible random RV32I programs that terminate by construction, on top of the
+RV32I reference model (tested against hand-computed vectors and the Verilated PicoRV32). No orchestrator, checker,
+estimator or report yet, so there are no results to report.
 
 ## Build (macOS)
 
@@ -28,6 +29,7 @@ Static analysis: `scripts/tidy.sh build/debug`.
 | --- | --- |
 | `cli/` | The `cutoff` command |
 | `model/` | RV32I decoder, encoder and reference model |
+| `gen/` | Seeded random-program generator (profile G0) |
 | `worker/` | Verilated core and memory model |
 | `rtl/` | `cutoff_core.v` wrapper; `picorv32/` is the pinned submodule |
 | `tests/` | GoogleTest unit tests |

@@ -29,6 +29,7 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(model)
+add_subdirectory(gen)
 add_subdirectory(worker)
 add_subdirectory(cli)
 
