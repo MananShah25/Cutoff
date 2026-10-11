@@ -10,7 +10,7 @@ namespace cutoff::engine {
 namespace {
 
 constexpr char kMagic[8] = {'C', 'U', 'T', 'O', 'F', 'F', 'C', 'K'};
-constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kVersion = 2;
 
 std::uint64_t fnv(const char* data, std::size_t n) {
   std::uint64_t h = 0xcbf29ce484222325ULL;
@@ -65,6 +65,14 @@ bool write_checkpoint(const std::string& path, const Checkpoint& cp, std::string
     o.put(s.last_new_n);
     o.put(static_cast<std::uint32_t>(s.per_species.size()));
     for (const std::uint32_t y : s.per_species) o.put(y);
+  }
+  o.put(static_cast<std::uint8_t>(cp.has_drill ? 1 : 0));
+  if (cp.has_drill) {
+    o.put(cp.drill_stop_at);
+    o.put(static_cast<std::uint32_t>(cp.drill_ids.size()));
+    for (const int id : cp.drill_ids) o.put(static_cast<std::int32_t>(id));
+    o.put(static_cast<std::uint32_t>(cp.drill_words.size()));
+    for (const std::uint64_t w : cp.drill_words) o.put(w);
   }
   o.put(fnv(o.bytes.data(), o.bytes.size()));
 
@@ -128,6 +136,16 @@ bool read_checkpoint(const std::string& path, Checkpoint& cp, std::string& error
     s.per_species.resize(n);
     for (auto& y : s.per_species) y = in.get<std::uint32_t>();
     c.sets.push_back(std::move(s));
+  }
+  c.has_drill = in.get<std::uint8_t>() != 0;
+  if (c.has_drill) {
+    c.drill_stop_at = in.get<std::uint64_t>();
+    const auto nids = in.get<std::uint32_t>();
+    if (nids > 100000) in.ok = false;
+    for (std::uint32_t i = 0; i < nids && in.ok; ++i) c.drill_ids.push_back(in.get<std::int32_t>());
+    const auto nwords = in.get<std::uint32_t>();
+    if (nwords > 10'000'000) in.ok = false;
+    for (std::uint32_t i = 0; i < nwords && in.ok; ++i) c.drill_words.push_back(in.get<std::uint64_t>());
   }
   if (!in.ok || in.pos + 8 != bytes.size()) { error = damaged; return false; }
   cp = std::move(c);

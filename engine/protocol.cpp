@@ -24,7 +24,7 @@ const char* to_string(Verdict v) {
 
 void encode_frame(const ProgramResult& r, std::vector<char>& out) {
   const std::size_t start = out.size();
-  std::size_t total = sizeof(EventRecord) + 2 * risk::kMaxSpeciesSets;
+  std::size_t total = sizeof(EventRecord) + 2 * risk::kMaxSpeciesSets + 2 + r.drill.size();
   for (const auto& ids : r.species) total += 2 * ids.size();
   out.resize(start + total);
   char* p = out.data() + start;
@@ -39,6 +39,10 @@ void encode_frame(const ProgramResult& r, std::vector<char>& out) {
     if (!ids.empty()) std::memcpy(p, ids.data(), 2 * ids.size());
     p += 2 * ids.size();
   }
+  const auto nd = static_cast<std::uint16_t>(r.drill.size());
+  std::memcpy(p, &nd, 2);
+  p += 2;
+  if (nd != 0) std::memcpy(p, r.drill.data(), nd);
 }
 
 std::size_t decode_frame(const char* data, std::size_t avail, ProgramResult& out) {
@@ -50,7 +54,10 @@ std::size_t decode_frame(const char* data, std::size_t avail, ProgramResult& out
     std::memcpy(&counts[i], data + sizeof(EventRecord) + 2 * i, 2);
     body += 2 * static_cast<std::size_t>(counts[i]);
   }
-  if (avail < head + body) return 0;
+  if (avail < head + body + 2) return 0;
+  std::uint16_t nd = 0;
+  std::memcpy(&nd, data + head + body, 2);
+  if (avail < head + body + 2 + nd) return 0;
   std::memcpy(&out.rec, data, sizeof out.rec);
   const char* p = data + head;
   for (std::size_t i = 0; i < risk::kMaxSpeciesSets; ++i) {
@@ -58,7 +65,9 @@ std::size_t decode_frame(const char* data, std::size_t avail, ProgramResult& out
     if (counts[i] != 0) std::memcpy(out.species[i].data(), p, 2 * static_cast<std::size_t>(counts[i]));
     p += 2 * static_cast<std::size_t>(counts[i]);
   }
-  return head + body;
+  p += 2;
+  out.drill.assign(reinterpret_cast<const std::uint8_t*>(p), reinterpret_cast<const std::uint8_t*>(p) + nd);
+  return head + body + 2 + nd;
 }
 
 bool write_full(int fd, const void* data, std::size_t n) {

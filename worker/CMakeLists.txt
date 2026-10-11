@@ -59,6 +59,7 @@ execute_process(COMMAND ${DRILL_TOOL}
     --rtl ${CUTOFF_RTL}/picorv32/picorv32.v --wrapper ${CUTOFF_RTL}/cutoff_core.v --regions ${DRILL_DIR}/picorv32_regions.txt
     --out-rtl ${DRILL_GEN}/picorv32_drill.v --out-manifest ${DRILL_GEN}/picorv32_mutants.tsv --out-wrapper ${DRILL_GEN}/cutoff_core_drill.v
     --out-embed ${DRILL_GEN}/drill_embedded.cpp
+    --out-infect-rtl ${DRILL_GEN}/picorv32_infect.v --out-infect-wrapper ${DRILL_GEN}/cutoff_core_infect.v
   RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 if(NOT _rc EQUAL 0)
   message(FATAL_ERROR "Mutant generation failed:\n${_err}")
@@ -78,3 +79,18 @@ if(CUTOFF_SANITIZE)
   target_link_options(cutoff_sim_drill PUBLIC -fsanitize=address,undefined)
 endif()
 set_source_files_properties(sim_drill.cpp PROPERTIES COMPILE_OPTIONS "${CUTOFF_OWN_FLAGS}")
+
+# The golden core with an `infected` output per mutant (no multiplexers, so it is as fast as the original apart from the
+# shadow evaluations).
+add_library(cutoff_sim_infect STATIC sim_infect.cpp)
+target_include_directories(cutoff_sim_infect PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(cutoff_sim_infect PUBLIC cutoff_model)
+verilate(cutoff_sim_infect
+  SOURCES ${DRILL_GEN}/cutoff_core_infect.v ${DRILL_GEN}/picorv32_infect.v
+  TOP_MODULE cutoff_core_infect
+  PREFIX Vcutoff_infect
+  VERILATOR_ARGS --public-flat-rw --no-timing --x-assign 0 --x-initial 0 -O2)
+if(CUTOFF_SANITIZE)
+  target_link_options(cutoff_sim_infect PUBLIC -fsanitize=address,undefined)
+endif()
+set_source_files_properties(sim_infect.cpp PROPERTIES COMPILE_OPTIONS "${CUTOFF_OWN_FLAGS}")

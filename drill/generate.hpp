@@ -12,6 +12,8 @@ struct GenerateResult {
   std::string instrumented;  // the whole source file with the module replaced by its selectable form
   std::string manifest;      // TSV, see manifest_tsv()
   std::string wrapper;       // the wrapper module with the extra mut_sel input, instantiating the instrumented core
+  std::string infect_source; // the golden module with one infected bit per mutant (see emit_infected)
+  std::string infect_wrapper;// its wrapper, exposing `infected`
   std::vector<Mutant> mutants;
   std::map<std::string, int> by_category;
   std::map<std::string, int> by_class;

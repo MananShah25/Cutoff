@@ -46,6 +46,22 @@ bool is_number(const std::string& s) {
   return !s.empty() && r.ec == std::errc() && r.ptr == s.data() + s.size();
 }
 
+constexpr const char* kDrillHelp =
+    "usage: cutoff drill [options]\n"
+    "  The fire drill: runs the same random-program campaign as `cutoff run`, and in addition plants the bugs (mutants) of the\n"
+    "  instrumented core against every program, to measure how many of them the campaign finds, and by when.\n"
+    "  The golden core is run once per program with an \"infected\" signal per mutant; a mutant is simulated only on programs\n"
+    "  that infect it (the activation filter). Per mutant it reports how far it got: infected > propagated > detected.\n"
+    "drill options:\n"
+    "  --mutants N          plant a random sample of N mutants (default: all eligible)\n"
+    "  --sample-seed S      seed of that sample (default: the campaign seed)\n"
+    "  --operators FILE     restrict the mutants: lines of [-]class:<operator class> or [-]category:<category>\n"
+    "  --no-filter          simulate every mutant on every program and check the filter for soundness (slower)\n"
+    "all `cutoff run` options apply (--max-programs, --epsilon, --confirm, --seed, --workers, --resume, ...); the stop rule is observed\n"
+    "and its first firing is reported, but the drill runs on to the program budget.\n"
+    "exit codes as for `cutoff run`: 0 / 1 (a failure of the golden core) / 2 (budget ended before the threshold) / 3 / 130\n"
+    "results: <results folder>/drill.tsv (one row per mutant) and the \"drill\" block of summary.json\n";
+
 bool parse_double(const std::string& s, double& out) {
   char* end = nullptr;
   out = std::strtod(s.c_str(), &end);
@@ -54,7 +70,7 @@ bool parse_double(const std::string& s, double& out) {
 
 }  // namespace
 
-int run_command(const std::vector<std::string>& args, std::ostream& out, std::ostream& err) {
+static int run_impl(const std::vector<std::string>& args, std::ostream& out, std::ostream& err, bool drill) {
   using engine::TomlValue;
   engine::CampaignConfig cfg;
   std::string config_path, run_id, resume_dir;
@@ -102,7 +118,11 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
       return true;
     };
     std::string v;
-    if (a == "--help" || a == "-h") { out << kHelp; return 0; }
+    if (a == "--help" || a == "-h") { out << (drill ? kDrillHelp : kHelp); return 0; }
+    else if (drill && a == "--mutants") { if (!value(v) || !set_int("drill.mutants", a, v)) return 3; }
+    else if (drill && a == "--sample-seed") { if (!value(v) || !set_int("drill.sample_seed", a, v)) return 3; }
+    else if (drill && a == "--operators") { if (!value(v)) return 3; set_str("drill.operators", v); }
+    else if (drill && a == "--no-filter") { TomlValue t; t.type = TomlValue::Type::Bool; t.b = false; overrides["drill.filter"] = t; }
     else if (a == "--progress") progress = 1;
     else if (a == "--no-progress") progress = 0;
     else if (a == "--config") { if (!value(config_path)) return 3; }
@@ -128,6 +148,12 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
     }
   }
 
+  if (drill) {
+    TomlValue t;
+    t.type = TomlValue::Type::Bool;
+    t.b = true;
+    overrides["drill.enabled"] = t;
+  }
   if (!resume_dir.empty()) {
     if (!config_path.empty() || !run_id.empty()) {
       err << "cutoff: --resume continues a saved run with its saved settings; do not combine it with --config or --run-id. Use options such as --max-programs to change settings.\n";
@@ -159,5 +185,9 @@ int run_command(const std::vector<std::string>& args, std::ostream& out, std::os
   const bool show = progress == 1 || (progress == -1 && isatty(STDERR_FILENO) != 0);
   return engine::execute_run(cfg, run_id, show, out, err, resume_dir).exit_code;
 }
+
+int run_command(const std::vector<std::string>& args, std::ostream& out, std::ostream& err) { return run_impl(args, out, err, false); }
+
+int drill_command(const std::vector<std::string>& args, std::ostream& out, std::ostream& err) { return run_impl(args, out, err, true); }
 
 }  // namespace cutoff

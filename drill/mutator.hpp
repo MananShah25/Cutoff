@@ -44,6 +44,14 @@ Plan plan_mutations(const Walk& walk, const RegionTable& table, std::string_view
 // The module source with every root expression replaced by its selectable form.
 std::string emit_instrumented(std::string_view source, const Walk& walk, const Plan& plan, const std::vector<Token>& toks, const std::string& module);
 
+// The golden copy of the module with one "infected" bit per mutant (bit K of the new `infected` output; bit 0 is 0).
+// Bit K is set when, at a point where the statement owning mutant K's expression really executes, that statement's
+// expression would evaluate differently under mutant K than it does in the original. The shadow evaluations are inserted
+// inside the original control flow (wrapping the statement, or resetting at the start of the always block), never change
+// the behaviour of the module, and are compared in a 64-bit context so signedness and truncation cannot hide a difference.
+// If no bit of mutant K is ever set during a run, a run of mutant K on the same program is identical to the golden run.
+std::string emit_infected(std::string_view source, const Walk& walk, const Plan& plan, const std::vector<Token>& toks);
+
 // manifest.tsv: id, site, category, op_class, kind, line, original, mutated.
 std::string manifest_tsv(const Plan& plan);
 

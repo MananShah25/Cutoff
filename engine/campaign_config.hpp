@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "generator.hpp"
 #include "species.hpp"
@@ -34,6 +35,13 @@ struct CampaignConfig {
   // [stop]  rule off while epsilon == 0; the other defaults are provisional until the benchmark (Step 11) chooses them
   risk::StopConfig stop;
   double max_hours = 0.0;                   // wall-clock budget across all sessions of a run; 0 = none
+  // [drill]  `cutoff drill` also runs planted bugs (mutants) of the instrumented core against every program
+  bool drill = false;
+  std::uint32_t drill_mutants = 0;       // 0 = every eligible mutant, otherwise a random sample of this size
+  std::int64_t drill_sample_seed = -1;   // seed of that sample; -1 = the campaign seed
+  std::string drill_operators;           // path of an operators file (see engine/drill_select.hpp); empty = every operator
+  bool drill_filter = true;              // activation filter: simulate a mutant only on programs that infect it
+  std::vector<int> drill_ids;            // the resolved selection (filled by execute_run; not a setting)
   // [output]
   std::string results_dir = "results";
   std::uint32_t max_failure_dirs = 20;

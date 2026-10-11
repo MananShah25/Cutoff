@@ -30,14 +30,16 @@ std::string_view drill_summary() { return detail::kDrillSummary; }
 namespace {
 
 struct DrillTraits {
-  static void select(Vcutoff_drill& top, std::uint32_t mutant) { top.mut_sel = static_cast<std::uint16_t>(mutant); }
-  static std::uint32_t reg(Vcutoff_drill& top, std::size_t i) { return top.rootp->cutoff_core_drill__DOT__cpu__DOT__cpuregs[i]; }
+  void select(Vcutoff_drill& top, std::uint32_t mutant) { top.mut_sel = static_cast<std::uint16_t>(mutant); }
+  void sample(Vcutoff_drill&) {}
+  std::uint32_t reg(Vcutoff_drill& top, std::size_t i) { return top.rootp->cutoff_core_drill__DOT__cpu__DOT__cpuregs[i]; }
 };
 
 }  // namespace
 
 RunResult run_program_mutant(std::span<const std::uint32_t> code, std::uint32_t mutant, const RunConfig& cfg) {
-  return detail::run_program_t<Vcutoff_drill, DrillTraits>(code, cfg, mutant);
+  DrillTraits traits;
+  return detail::run_program_t<Vcutoff_drill, DrillTraits>(code, cfg, mutant, traits);
 }
 
 }  // namespace cutoff

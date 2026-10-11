@@ -29,6 +29,7 @@ struct SummaryInput {
   double risk_used = 0;             // the value the stop rule compares with epsilon
   std::uint64_t plateau_stop_at = 0;
   std::uint32_t stop_consecutive = 0;
+  std::string drill_json;           // the "drill" object for summary.json (empty outside a drill)
 };
 
 class ResultsWriter {
@@ -46,6 +47,8 @@ class ResultsWriter {
   const std::string& dir() const { return dir_; }
 
   bool write_summary(const SummaryInput& in, std::string& error);
+  // A file next to summary.json (e.g. drill.tsv).
+  bool write_aux(const std::string& name, const std::string& text, std::string& error);
 
  private:
   ResultsWriter(const CampaignConfig& cfg, std::string run_dir) : cfg_(cfg), dir_(std::move(run_dir)) {}

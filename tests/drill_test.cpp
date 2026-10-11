@@ -463,6 +463,71 @@ TEST(DrillEmit, NestedSitesComposeAndTheTextOutsideStaysIdentical) {
   EXPECT_EQ(again.error, "") << "and walkable";
 }
 
+// ---------------------------------------------------------------- the infected-bit core
+
+TEST(DrillInfect, ShadowStatementsSitInsideTheOriginalControlFlow) {
+  const Snippet s = make(
+      "reg [7:0] x; reg y; wire [7:0] w;\n"
+      "always @(posedge clk) begin\n"
+      "  if (a && b) x <= x + 1;\n"
+      "  else y <= !a;\n"
+      "end\n"
+      "assign w = x - 3;\n",
+      "arith,logic,not");
+  const std::string out = emit_infected(s.source, s.walk, s.plan, s.lex.tokens);
+  const int n = static_cast<int>(s.plan.mutants.size());
+  ASSERT_GE(n, 4);
+  EXPECT_NE(out.find("module m (\n\toutput [" + std::to_string(n) + ":0] infected,input clk"), std::string::npos) << out;
+  EXPECT_NE(out.find("assign infected = {inf_" + std::to_string(n)), std::string::npos);
+  EXPECT_NE(out.find(", 1'b0};"), std::string::npos) << "bit 0 is constant 0";
+  // every mutant has exactly one declaration, as a reg when its statement is in an always block and a wire when continuous
+  for (int id = 1; id <= n; ++id) {
+    const std::string name = "inf_" + std::to_string(id) + ";";
+    const bool wire = out.find("wire " + name) != std::string::npos, reg = out.find("reg " + name) != std::string::npos;
+    EXPECT_TRUE(wire != reg) << "mutant " << id << " must be declared exactly once";
+  }
+  EXPECT_NE(out.find("wire inf_" + std::to_string(n) + ";"), std::string::npos) << "the continuous assign's mutant is a wire";
+  EXPECT_NE(out.find("assign inf_" + std::to_string(n) + " = (inf_a"), std::string::npos);
+  // the always block resets every infected reg it hosts at its start, so no latch is inferred
+  EXPECT_NE(out.find("always @(posedge clk) begin\n  inf_1 = 1'b0;\n  inf_2 = 1'b0;"), std::string::npos) << out;
+  // the original statements are all still there, untouched and in order
+  const std::size_t p1 = out.find("x <= x + 1;"), p2 = out.find("y <= !a;");
+  ASSERT_NE(p1, std::string::npos);
+  ASSERT_NE(p2, std::string::npos);
+  EXPECT_LT(p1, p2);
+  EXPECT_NE(out.find("assign w = x - 3;"), std::string::npos);
+  // shadows compare the original root with the root under each mutant, in a 64-bit context
+  EXPECT_NE(out.find("inf_a = (a && b) ? 64'd1 : 64'd0;"), std::string::npos) << out;
+  EXPECT_NE(out.find("inf_b = ((a) || (b)) ? 64'd1"), std::string::npos) << "the && -> || mutant of the condition";
+  EXPECT_NE(out.find("inf_a = x + 1;"), std::string::npos);
+  EXPECT_NE(out.find("x + 1;\nend"), std::string::npos) << "the wrapper closes after the original statement";
+  // the result is still valid input for our own front end
+  const LexResult re = lex(out);
+  ASSERT_EQ(re.error, "");
+  EXPECT_EQ(walk_module(re.tokens, out, "m", {}).error, "");
+}
+
+TEST(DrillInfect, ChainedElseIfIsWrappedWithoutBreakingTheChain) {
+  const Snippet s = make("reg x;\nalways @* begin\n  if (a) x = 1; else if (b + 1 == 2) x = 0; else x = a;\nend\n", "arith,eq");
+  const std::string out = emit_infected(s.source, s.walk, s.plan, s.lex.tokens);
+  EXPECT_NE(out.find("else begin : inf_blk"), std::string::npos) << "the inner if becomes the body of the else";
+  const std::size_t e1 = out.find("else begin : inf_blk");
+  EXPECT_NE(out.find("else x = a;", e1), std::string::npos) << "the final else stays attached to the inner if";
+  const LexResult re = lex(out);
+  ASSERT_EQ(re.error, "");
+  EXPECT_EQ(walk_module(re.tokens, out, "m", {}).error, "");
+}
+
+TEST(DrillInfect, StatementsWithoutBeginAreWrappedSoTheyStayOneStatement) {
+  const Snippet s = make("reg x, y;\nalways @* if (a) x = b + 1; else y = a - b;\n", "arith");
+  const std::string out = emit_infected(s.source, s.walk, s.plan, s.lex.tokens);
+  EXPECT_NE(out.find("if (a) begin : inf_blk"), std::string::npos) << out;
+  EXPECT_NE(out.find("else begin : inf_blk"), std::string::npos);
+  const LexResult re = lex(out);
+  ASSERT_EQ(re.error, "");
+  EXPECT_EQ(walk_module(re.tokens, out, "m", {}).error, "");
+}
+
 // ---------------------------------------------------------------- the real core
 
 class RealCore : public ::testing::Test {
@@ -571,4 +636,26 @@ TEST_F(RealCore, ADifferentSourceVersionIsRefusedNotMisread) {
   EXPECT_NE(r.error.find("different version of the core source"), std::string::npos) << r.error;
   EXPECT_TRUE(r.instrumented.empty());
   EXPECT_NE(generate_drill(rtl_, "module x;\nendmodule\n", regions_).error.find("module cutoff_core ("), std::string::npos);
+}
+
+TEST_F(RealCore, TheInfectedCoreIsGeneratedForEveryMutantAndStaysParseable) {
+  ASSERT_EQ(result_.error, "");
+  ASSERT_FALSE(result_.infect_source.empty());
+  for (const Mutant& m : result_.mutants) {
+    const std::string name = "inf_" + std::to_string(m.id) + ";";
+    EXPECT_TRUE(result_.infect_source.find("reg " + name) != std::string::npos || result_.infect_source.find("wire " + name) != std::string::npos) << m.id;
+  }
+  const LexResult l = lex(result_.infect_source);
+  ASSERT_EQ(l.error, "");
+  EXPECT_EQ(walk_module(l.tokens, result_.infect_source, "picorv32", {}).error, "");
+  EXPECT_NE(result_.infect_wrapper.find("module cutoff_core_infect ("), std::string::npos);
+  EXPECT_NE(result_.infect_wrapper.find("output [201:0] infected"), std::string::npos);
+  EXPECT_NE(result_.infect_wrapper.find(".infected  (infected),"), std::string::npos);
+  // The infected core differs from the original only by insertions: the original's token sequence is a subsequence of it.
+  const LexResult orig = lex(rtl_);
+  ASSERT_EQ(orig.error, "");
+  std::size_t j = 0;
+  for (const Token& t : l.tokens)
+    if (j < orig.tokens.size() && t.text == orig.tokens[j].text) ++j;
+  EXPECT_EQ(j, orig.tokens.size()) << "original token " << j << " is missing or out of order";
 }

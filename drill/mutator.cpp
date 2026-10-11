@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <set>
 #include <sstream>
 
@@ -373,6 +374,106 @@ std::string emit_instrumented(std::string_view source, const Walk& walk, const P
     out += std::string(source.substr(pos, e.begin - pos));
     out += e.text;
     pos = e.end;
+  }
+  out += std::string(source.substr(pos));
+  return out;
+}
+
+std::string emit_infected(std::string_view source, const Walk& walk, const Plan& plan, const std::vector<Token>& toks) {
+  struct Shadow {
+    int id;
+    std::string root_k;  // the root expression text with mutant `id` applied
+  };
+  struct RootInfo {
+    const Root* root;
+    std::vector<Shadow> shadows;
+  };
+  std::vector<RootInfo> roots;
+  for (const Root& r : walk.roots) {
+    RootInfo info{&r, {}};
+    const std::string root_src = source_text(source, *r.expr);
+    std::function<void(const Expr&)> collect = [&](const Expr& e) {
+      const auto it = plan.variants.find(&e);
+      if (it != plan.variants.end()) {
+        for (const VariantSpec& v : it->second) {
+          const std::string self = source_text(source, e);
+          const std::string arm = harmonise(compose(e, v, [&](const Expr& c) { return source_text(source, c); }, self), expr_signed(e), variant_signed(e, v));
+          const std::size_t b = e.src_begin - r.expr->src_begin, len = e.src_end - e.src_begin;
+          info.shadows.push_back({v.id, root_src.substr(0, b) + arm + root_src.substr(b + len)});
+        }
+      }
+      for (const auto& k : e.kids) collect(*k);
+    };
+    collect(*r.expr);
+    if (!info.shadows.empty()) roots.push_back(std::move(info));
+  }
+
+  struct Insertion {
+    std::size_t offset;
+    int depth;
+    bool is_end;
+    std::string text;
+  };
+  std::vector<Insertion> ins;
+  std::map<int, std::vector<int>> block_ids;  // always block -> mutant ids it hosts
+  std::string decls;
+  std::vector<bool> is_wire(plan.mutants.size() + 1, false);
+  int serial = 0;
+  for (const RootInfo& info : roots) {
+    const Root& r = *info.root;
+    const std::string orig = source_text(source, *r.expr);
+    const bool cond = r.kind == Root::Kind::Cond;
+    auto as_value = [&](const std::string& text) { return cond ? "(" + text + ") ? 64'd1 : 64'd0" : text; };
+    const int n = serial++;
+    if (r.continuous) {
+      std::string text = "\n/* verilator lint_off UNSIGNED */\nwire [63:0] inf_a" + std::to_string(n) + " = " + as_value(orig) + ";";
+      for (const Shadow& s : info.shadows) {
+        is_wire[static_cast<std::size_t>(s.id)] = true;
+        text += "\nwire [63:0] inf_b" + std::to_string(n) + "_" + std::to_string(s.id) + " = " + as_value(s.root_k) + ";";
+        text += "\nassign inf_" + std::to_string(s.id) + " = (inf_a" + std::to_string(n) + " != inf_b" + std::to_string(n) + "_" + std::to_string(s.id) + ");";
+      }
+      text += "\n/* verilator lint_on UNSIGNED */";
+      ins.push_back({toks[r.stmt_end - 1].end, 1, true, text});
+    } else {
+      // Shadow evaluations of a mutated constant can be always-true/false comparisons; that is the point of the mutant.
+      std::string text = "begin : inf_blk" + std::to_string(n) + "\n  reg [63:0] inf_a, inf_b;\n  /* verilator lint_off UNSIGNED */\n  inf_a = " + as_value(orig) + ";";
+      for (const Shadow& s : info.shadows) {
+        text += "\n  inf_b = " + as_value(s.root_k) + "; inf_" + std::to_string(s.id) + " = (inf_a != inf_b);";
+        block_ids[r.block].push_back(s.id);
+      }
+      text += "\n  /* verilator lint_on UNSIGNED */\n";
+      ins.push_back({toks[r.stmt_begin].begin, 1, false, text});
+      ins.push_back({toks[r.stmt_end - 1].end, 1, true, "\nend"});
+    }
+  }
+  for (const auto& [b, ids] : block_ids) {
+    std::string text = "begin\n";
+    for (const int id : ids) text += "  inf_" + std::to_string(id) + " = 1'b0;\n";
+    const Block& blk = walk.blocks[static_cast<std::size_t>(b)];
+    ins.push_back({toks[blk.begin].begin, 0, false, text});
+    ins.push_back({toks[blk.end - 1].end, 0, true, "\nend"});
+  }
+  // declarations right after the module header, the vector at the end of the module
+  const int count = static_cast<int>(plan.mutants.size());
+  for (int id = 1; id <= count; ++id) decls += std::string("\n") + (is_wire[static_cast<std::size_t>(id)] ? "wire" : "reg") + " inf_" + std::to_string(id) + ";";
+  ins.push_back({toks[walk.header_end - 1].end, 0, true, decls});
+  std::string vec = "\nassign infected = {";
+  for (int id = count; id >= 1; --id) vec += "inf_" + std::to_string(id) + ", ";
+  vec += "1'b0};\n";
+  ins.push_back({toks[walk.endmodule].begin, 0, false, vec});
+  ins.push_back({toks[walk.port_list_open].end, 0, false, "\n\toutput [" + std::to_string(count) + ":0] infected,"});
+
+  std::stable_sort(ins.begin(), ins.end(), [](const Insertion& a, const Insertion& b) {
+    if (a.offset != b.offset) return a.offset < b.offset;
+    if (a.is_end != b.is_end) return a.is_end;  // close earlier constructs before opening new ones
+    return a.is_end ? a.depth > b.depth : a.depth < b.depth;
+  });
+  std::string out;
+  std::size_t pos = 0;
+  for (const Insertion& i : ins) {
+    out += std::string(source.substr(pos, i.offset - pos));
+    out += i.text;
+    pos = i.offset;
   }
   out += std::string(source.substr(pos));
   return out;

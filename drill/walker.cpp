@@ -68,7 +68,9 @@ struct W {
     return i;
   }
 
-  std::size_t assignment(std::size_t i, bool live) {
+  int current_block = -1;
+
+  std::size_t assignment(std::size_t i, bool live, std::size_t stmt_begin, bool continuous) {
     // lvalue: ident with selects, or a concatenation
     std::string lhs;
     std::size_t j = i;
@@ -93,6 +95,10 @@ struct W {
       r.expr = e;
       r.lhs = lhs;
       r.line = t[rhs_begin].line;
+      r.stmt_begin = stmt_begin;
+      r.stmt_end = j + 1;
+      r.continuous = continuous;
+      r.block = continuous ? -1 : current_block;
       out.roots.push_back(r);
     }
     ++out.live_statements;
@@ -112,7 +118,7 @@ struct W {
     }
     if (k.kind == Tok::Op) {
       if (k.text == ";") return i + 1;
-      if (k.text == "{") return assignment(i, live);
+      if (k.text == "{") return assignment(i, live, i, false);
       if (k.text == "#") return i + 2;
       fail(i, "unexpected token at statement start");
       return i;
@@ -130,6 +136,7 @@ struct W {
       return i + 1;
     }
     if (w == "if") {
+      const std::size_t if_begin = i;
       ++i;
       if (!is(i, "(")) { fail(i, "expected '(' after if"); return i; }
       ++i;
@@ -140,15 +147,20 @@ struct W {
       if (cond != nullptr) v = fold_const(*cond, out.params);
       const bool then_live = live && !(v && *v == 0);
       const bool else_live = live && !(v && *v != 0);
+      std::optional<std::size_t> root_index;
       if (live && cond != nullptr && !v) {
         Root r;
         r.kind = Root::Kind::Cond;
         r.expr = cond;
         r.line = t[cond->tok_begin].line;
+        r.stmt_begin = if_begin;
+        r.block = current_block;
         out.roots.push_back(r);
+        root_index = out.roots.size() - 1;
       }
       i = stmt(i, then_live);
       if (is(i, "else")) i = stmt(i + 1, else_live);
+      if (root_index) out.roots[*root_index].stmt_end = i;
       return i;
     }
     if (w == "case" || w == "casez" || w == "casex") {
@@ -198,10 +210,18 @@ struct W {
         if (is(i, "(")) i = skip_group(i);
         else ++i;  // @*
       }
-      return stmt(i, live);
+      const int saved_block = current_block;
+      if (live) {
+        out.blocks.push_back({i, 0});
+        current_block = static_cast<int>(out.blocks.size()) - 1;
+      }
+      i = stmt(i, live);
+      if (live) out.blocks[static_cast<std::size_t>(current_block)].end = i;
+      current_block = saved_block;
+      return i;
     }
     if (w == "initial") return stmt(i + 1, false);
-    if (w == "assign") return assignment(i + 1, live);
+    if (w == "assign") return assignment(i + 1, live, i, true);
     if (w == "generate" || w == "endgenerate") return i + 1;
     if (w == "function" || w == "task") {
       const std::string_view end_word = w == "function" ? "endfunction" : "endtask";
@@ -211,7 +231,7 @@ struct W {
     static const std::set<std::string_view> decls = {"reg", "wire", "integer", "parameter", "localparam", "input", "output", "inout",
                                                      "genvar", "real", "time", "tri", "supply0", "supply1", "wand", "wor"};
     if (decls.count(w) != 0) return skip_to_semicolon(i);
-    return assignment(i, live);  // an assignment, or an instance (skipped to its ';')
+    return assignment(i, live, i, false);  // an assignment, or an instance (skipped to its ';')
   }
 };
 
@@ -265,6 +285,8 @@ Walk walk_module(const std::vector<Token>& toks, std::string_view source, const 
   out.port_list_open = i;
   i = w.skip_group(i);
   if (w.is(i, ";")) ++i;
+  out.header_end = i;
+  out.endmodule = end;
   while (i < end && !w.failed()) i = w.stmt(i, true);
   if (w.failed()) out.error = w.error;
   return out;

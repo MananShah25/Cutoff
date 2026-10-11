@@ -197,6 +197,8 @@ void ResultsWriter::write_failure_dir(const EventRecord& rec) {
   write_text(dir / "program.hex", hex.str(), ignored);
 }
 
+bool ResultsWriter::write_aux(const std::string& name, const std::string& text, std::string& error) { return write_text(fs::path(dir_) / name, text, error); }
+
 bool ResultsWriter::write_summary(const SummaryInput& in, std::string& error) {
   std::ostringstream j;
   auto num = [](double v) {
@@ -229,6 +231,7 @@ bool ResultsWriter::write_summary(const SummaryInput& in, std::string& error) {
       << ", \"chao2_bias_corrected\": " << num(s.chao2_bias_corrected) << ", \"programs_since_new\": " << s.programs_since_new << "}";
   }
   j << "]},\n"
+    << (in.drill_json.empty() ? std::string() : "  \"drill\": " + in.drill_json + ",\n")
     << "  \"failures\": {\"count\": " << totals_.failures << ", \"failure_dirs_written\": " << totals_.failure_dirs_written << ", \"by_verdict\": {";
   for (std::size_t v = 1; v < totals_.by_verdict.size(); ++v)
     j << (v > 1 ? ", " : "") << "\"" << to_string(static_cast<Verdict>(v)) << "\": " << totals_.by_verdict[v];

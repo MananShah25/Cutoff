@@ -22,8 +22,9 @@ namespace cutoff {
 namespace {
 
 struct OriginalTraits {
-  static void select(Vcutoff_core&, std::uint32_t) {}
-  static std::uint32_t reg(Vcutoff_core& top, std::size_t i) { return top.rootp->cutoff_core__DOT__cpu__DOT__cpuregs[i]; }
+  void select(Vcutoff_core&, std::uint32_t) {}
+  void sample(Vcutoff_core&) {}
+  std::uint32_t reg(Vcutoff_core& top, std::size_t i) { return top.rootp->cutoff_core__DOT__cpu__DOT__cpuregs[i]; }
 };
 
 }  // namespace
@@ -36,7 +37,8 @@ void set_runtime_random_reset(int mode, unsigned seed) {
 std::string verilator_version() { return Verilated::productVersion(); }
 
 RunResult run_program(std::span<const std::uint32_t> code, const RunConfig& cfg) {
-  return detail::run_program_t<Vcutoff_core, OriginalTraits>(code, cfg, 0);
+  OriginalTraits traits;
+  return detail::run_program_t<Vcutoff_core, OriginalTraits>(code, cfg, 0, traits);
 }
 
 }  // namespace cutoff

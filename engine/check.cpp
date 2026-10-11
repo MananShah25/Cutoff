@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "drill_levels.hpp"
 #include "generator.hpp"
 #include "sim_drill.hpp"
 
@@ -35,12 +36,39 @@ Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   const bool want_species = cfg.species.any();
   e.model = run_model(e.program.code, {cfg.max_instructions, want_species});
   if (want_species && e.model.status == Status::Exited) e.species = risk::extract_species(e.model.retired, cfg.species);
-  e.core = cfg.mutant < 0 ? run_program(e.program.code, {cfg.max_cycles})
-                          : run_program_mutant(e.program.code, static_cast<std::uint32_t>(cfg.mutant), {cfg.max_cycles});
+  if (cfg.drill) {  // the golden run of a drill is the infect model, which behaves exactly like the original core
+    InfectedRun g = run_program_infected(e.program.code, {cfg.max_cycles});
+    e.core = g.run;
+    e.infected = std::move(g.words);
+  } else {
+    e.core = cfg.mutant < 0 ? run_program(e.program.code, {cfg.max_cycles})
+                            : run_program_mutant(e.program.code, static_cast<std::uint32_t>(cfg.mutant), {cfg.max_cycles});
+  }
 
   // Test hook (debug.corrupt_core_every): fake a core bug so the failure path can be exercised end to end.
   if (cfg.corrupt_core_every != 0 && (program_id + 1) % cfg.corrupt_core_every == 0) e.core.regs[5] ^= 1u;
   return e;
+}
+
+// One level byte per selected mutant for this program (see drill_levels.hpp).
+std::vector<std::uint8_t> drill_levels(const CampaignConfig& cfg, const Execution& golden) {
+  std::vector<std::uint8_t> levels(cfg.drill_ids.size(), 0);
+  // A mutant that runs far past the golden run's length is hung; the cycle limit keeps such runs cheap.
+  const std::uint64_t limit = std::min<std::uint64_t>(cfg.max_cycles, 8 * golden.core.cycles + 2000);
+  for (std::size_t j = 0; j < cfg.drill_ids.size(); ++j) {
+    const int id = cfg.drill_ids[j];
+    const bool infected = ((golden.infected[static_cast<std::size_t>(id) / 32] >> (id % 32)) & 1u) != 0;
+    std::uint8_t b = infected ? kLevelInfected : 0;
+    if (infected || !cfg.drill_filter) {
+      b |= kLevelRan;
+      const RunResult m = run_program_mutant(golden.program.code, static_cast<std::uint32_t>(id), {limit});
+      const RunResult& g = golden.core;
+      if (m.status != g.status || m.exit_code != g.exit_code || m.regs != g.regs || m.mem_hash != g.mem_hash || m.bus_hash != g.bus_hash) b |= kLevelPropagated;
+      if (golden.model.status == Status::Exited && check_c1(golden.model, m).verdict != Verdict::Pass) b |= kLevelDetected;
+    }
+    levels[j] = b;
+  }
+  return levels;
 }
 
 EventRecord evaluate_program(const CampaignConfig& cfg, std::uint64_t program_id) { return evaluate(cfg, program_id).rec; }
@@ -68,6 +96,7 @@ ProgramResult evaluate(const CampaignConfig& cfg, std::uint64_t program_id) {
   ProgramResult result;
   result.rec = rec;
   result.species = std::move(e.species);
+  if (cfg.drill) result.drill = drill_levels(cfg, e);
   return result;
 }
 

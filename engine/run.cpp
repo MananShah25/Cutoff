@@ -5,10 +5,15 @@
 #include <cstdio>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <ostream>
 
 #include "campaign.hpp"
 #include "checkpoint.hpp"
+#include "drill_report.hpp"
+#include "drill_select.hpp"
+#include "drill_tally.hpp"
 #include "results.hpp"
 #include "risk_monitor.hpp"
 #include "system_info.hpp"
@@ -27,18 +32,27 @@ enum class SinkStop : std::uint8_t { None, Threshold, TimeBudget, DebugInterrupt
 // Ties together everything that happens for each delivered program, in program-id order.
 class RunSink : public RecordSink {
  public:
-  RunSink(const CampaignConfig& cfg, ResultsWriter& writer, RiskMonitor& monitor, std::uint64_t stream, double elapsed_before, std::uint32_t sessions)
-      : cfg_(cfg), writer_(writer), monitor_(monitor), stream_(stream), elapsed_before_(elapsed_before), sessions_(sessions),
+  RunSink(const CampaignConfig& cfg, ResultsWriter& writer, RiskMonitor& monitor, DrillTally* tally, std::uint64_t stream, double elapsed_before, std::uint32_t sessions)
+      : cfg_(cfg), writer_(writer), monitor_(monitor), tally_(tally), stream_(stream), elapsed_before_(elapsed_before), sessions_(sessions),
         t0_(std::chrono::steady_clock::now()) {}
+
+  // Drill: the stop rule is only observed (its first firing is remembered), the campaign runs on to the budget so that the
+  // planted bugs can also be counted after the stop point.
+  std::uint64_t stop_at() const { return stop_at_; }
+  void restore_stop_at(std::uint64_t n) { stop_at_ = n; }
 
   bool on_record(const ProgramResult& r) override {
     writer_.append(r.rec);
+    if (tally_ != nullptr) tally_->observe(r.rec.program_id, r.drill);
     monitor_.add_program(r.species);
     const std::uint64_t n = monitor_.programs();
     if (monitor_.at_checkpoint()) {
       monitor_.evaluate();
       if (!save_checkpoint()) return stop(SinkStop::Error);
-      if (monitor_.should_stop()) return stop(SinkStop::Threshold);
+      if (monitor_.should_stop()) {
+        if (tally_ == nullptr) return stop(SinkStop::Threshold);
+        if (stop_at_ == 0) stop_at_ = n;
+      }
       if (cfg_.max_hours > 0 && elapsed() > cfg_.max_hours * 3600.0) return stop(SinkStop::TimeBudget);
     }
     if (cfg_.interrupt_after != 0 && n == cfg_.interrupt_after) return stop(SinkStop::DebugInterrupt);
@@ -61,6 +75,12 @@ class RunSink : public RecordSink {
     cp.sessions = sessions_;
     cp.totals = writer_.totals();
     monitor_.export_state(cp);
+    if (tally_ != nullptr) {
+      cp.has_drill = true;
+      cp.drill_stop_at = stop_at_;
+      cp.drill_ids = tally_->ids();
+      cp.drill_words = tally_->to_words();
+    }
     return write_checkpoint((fs::path(writer_.dir()) / "checkpoint.bin").string(), cp, error_);
   }
 
@@ -73,6 +93,8 @@ class RunSink : public RecordSink {
   const CampaignConfig& cfg_;
   ResultsWriter& writer_;
   RiskMonitor& monitor_;
+  DrillTally* tally_;
+  std::uint64_t stop_at_ = 0;
   std::uint64_t stream_;
   double elapsed_before_;
   std::uint32_t sessions_;
@@ -92,12 +114,33 @@ std::string default_run_id(const CampaignConfig& cfg) {
   return std::string(buf) + "-seed" + std::to_string(cfg.seed);
 }
 
-RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, bool show_progress, std::ostream& out, std::ostream& err,
+RunOutcome execute_run(const CampaignConfig& cfg_in, const std::string& run_id_in, bool show_progress, std::ostream& out, std::ostream& err,
                        const std::string& resume_dir) {
   RunOutcome outcome;
+  CampaignConfig cfg = cfg_in;  // the drill selection is resolved into this copy
+  // A drill program costs about one simulation per mutant, so batches of 64 programs would leave most workers idle.
+  if (cfg.drill) cfg.batch_size = std::min<std::uint32_t>(cfg.batch_size, 4);
   if (const std::string bad = validate(cfg); !bad.empty()) {
     err << "cutoff: " << bad << "\n";
     return outcome;
+  }
+  if (cfg.drill) {
+    std::string ops_text, select_error;
+    if (!cfg.drill_operators.empty()) {
+      std::ifstream f(cfg.drill_operators);
+      if (!f) {
+        err << "cutoff: cannot read the operators file '" << cfg.drill_operators << "'. Check drill.operators / --operators.\n";
+        return outcome;
+      }
+      std::stringstream ss;
+      ss << f.rdbuf();
+      ops_text = ss.str();
+    }
+    cfg.drill_ids = select_mutants(ops_text, cfg.drill_mutants, cfg.drill_sample_seed >= 0 ? static_cast<std::uint64_t>(cfg.drill_sample_seed) : cfg.seed, select_error);
+    if (!select_error.empty()) {
+      err << "cutoff: " << select_error << "\n";
+      return outcome;
+    }
   }
   const bool resuming = !resume_dir.empty();
   std::string run_id = run_id_in;
@@ -117,6 +160,11 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
       err << "cutoff: cannot resume " << resume_dir << ": the settings that decide what each program is (seed, generator, checker limits, "
           << "species sets, core) differ from the saved run. Resuming would mix two different campaigns. Remove the conflicting overrides, "
           << "or start a new run.\n";
+      return outcome;
+    }
+    if (cp.has_drill != cfg.drill || (cfg.drill && cp.drill_ids != cfg.drill_ids)) {
+      err << "cutoff: cannot resume " << resume_dir << ": it was started " << (cp.has_drill ? "as a drill" : "without a drill")
+          << (cp.has_drill && cfg.drill ? " with a different selection of mutants" : "") << ". Use the same drill settings (drill.mutants, drill.sample_seed, drill.operators).\n";
       return outcome;
     }
     writer = ResultsWriter::resume(cfg, resume_dir, cp, error);
@@ -147,10 +195,23 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
   const double elapsed_before = resuming ? cp.elapsed_seconds : 0.0;
   const std::string started = utc_timestamp();
   const std::uint64_t first_id = resuming ? cp.next_program_id : 0;
-  RunSink sink(cfg, *writer, monitor, stream_hash(cfg), elapsed_before, sessions);
+  DrillTally tally;
+  if (cfg.drill) {
+    tally = DrillTally(cfg.drill_ids);
+    if (resuming) {
+      bool ok = false;
+      tally = DrillTally::from_words(cfg.drill_ids, cp.drill_words, ok);
+      if (!ok) {
+        err << "cutoff: the checkpoint's drill data does not match the current mutant selection; it cannot be resumed.\n";
+        return outcome;
+      }
+    }
+  }
+  RunSink sink(cfg, *writer, monitor, cfg.drill ? &tally : nullptr, stream_hash(cfg), elapsed_before, sessions);
+  if (resuming && cfg.drill) sink.restore_stop_at(cp.drill_stop_at);
 
   // A resumed run whose saved state already satisfies the (possibly new) stop rule has nothing left to do.
-  const bool already_satisfied = resuming && monitor.should_stop();
+  const bool already_satisfied = resuming && !cfg.drill && monitor.should_stop();
 
   g_interrupt = 0;
   struct sigaction handler {}, old_int {}, old_term {};
@@ -211,6 +272,7 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
     in.risk_used = monitor.tracking() ? monitor.current_risk() : 0.0;
     in.plateau_stop_at = monitor.plateau_stop_at();
     in.stop_consecutive = monitor.rule().consecutive();
+    if (cfg.drill) in.drill_json = drill_json(make_drill_report(tally, all_mutants(), sink.stop_at()));
     return in;
   };
 
@@ -226,7 +288,7 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
   }
 
   const bool rule_on = cfg.stop.epsilon > 0;
-  if (sink.stopped_for() == SinkStop::Threshold || already_satisfied) outcome.stop_reason = "threshold";
+  if (sink.stopped_for() == SinkStop::Threshold || already_satisfied || (cfg.drill && sink.stop_at() > 0 && sink.stopped_for() == SinkStop::None)) outcome.stop_reason = "threshold";
   else if (sink.stopped_for() == SinkStop::TimeBudget) outcome.stop_reason = "time-budget";
   else outcome.stop_reason = rule_on ? "budget" : "program-count";
 
@@ -236,6 +298,11 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
 
   const SummaryInput in = make_summary();
   std::string summary_error;
+  if (cfg.drill && !writer->write_aux("drill.tsv", drill_tsv(tally, all_mutants(), sink.stop_at()), summary_error)) {
+    err << "cutoff: " << summary_error << "\n";
+    outcome.exit_code = 3;
+    return outcome;
+  }
   if (!writer->write_summary(in, summary_error)) {
     err << "cutoff: " << summary_error << "\n";
     outcome.exit_code = 3;
@@ -258,6 +325,7 @@ RunOutcome execute_run(const CampaignConfig& cfg, const std::string& run_id_in, 
     out << "stopped:        time budget (" << cfg.max_hours << " h) used up before the risk fell below epsilon " << cfg.stop.epsilon << " (risk now " << risk_text << ")\n";
   else
     out << "stopped:        all " << cfg.programs << " programs ran (stop rule off)\n";
+  if (cfg.drill) out << drill_text(make_drill_report(tally, all_mutants(), sink.stop_at()));
   for (const SetSummary& s : in.sets) {
     char line[200];
     std::snprintf(line, sizeof line, "species %-6s %llu of %zu cells seen, %llu singletons, good-turing %.4g\n", (s.name + ":").c_str(),

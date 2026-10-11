@@ -52,10 +52,11 @@ static_assert(std::is_trivially_copyable_v<EventRecord>);
 struct ProgramResult {
   EventRecord rec;
   risk::SpeciesIds species;
+  std::vector<std::uint8_t> drill;  // one level byte per selected mutant (drill_levels.hpp); empty outside a drill
 };
 
 // Wire frame: EventRecord, then one little-endian u16 species count per set (kMaxSpeciesSets of them), then the ids of
-// each set in order. Only `rec` goes into events.bin; the species feed the estimators and are not stored.
+// each set in order, then a u16 drill-byte count and those bytes. Only `rec` goes into events.bin; the species feed the estimators and are not stored.
 void encode_frame(const ProgramResult& r, std::vector<char>& out);
 // Decodes one frame from the front of `data`. Returns the bytes consumed, or 0 if `avail` holds only part of a frame.
 std::size_t decode_frame(const char* data, std::size_t avail, ProgramResult& out);

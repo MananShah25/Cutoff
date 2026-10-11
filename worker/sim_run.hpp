@@ -1,8 +1,9 @@
 #pragma once
 // The cycle loop and the memory slave shared by the original core model and the instrumented (mutant) core model.
-// `Top` is a Verilated model class; `Traits` supplies the two things that differ between them:
-//   static void select(Top&, std::uint32_t mutant);          // drive mut_sel (a no-op for the original core)
-//   static std::uint32_t reg(Top&, std::size_t index);       // read architectural register x<index>
+// `Top` is a Verilated model class; the `Traits` object supplies what differs between the models:
+//   void select(Top&, std::uint32_t mutant);          // drive mut_sel (a no-op for models without it)
+//   std::uint32_t reg(Top&, std::size_t index);       // read architectural register x<index>
+//   void sample(Top&);                                 // called after every eval (the infect model collects its outputs here)
 // The including .cpp must have included the Verilator headers of `Top` first.
 
 #include <cstdint>
@@ -29,7 +30,7 @@ inline void mix(std::uint64_t& h, std::uint64_t v) {
 
 
 template <class Top, class Traits>
-RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cfg, std::uint32_t mutant) {
+RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cfg, std::uint32_t mutant, Traits& traits) {
   RunResult res;
   res.trace_hash = kFnvOffset;
 
@@ -38,7 +39,8 @@ RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cf
     for (unsigned b = 0; b < 4; ++b) ram[4 * i + b] = static_cast<std::uint8_t>(code[i] >> (8 * b));
 
   auto top = std::make_unique<Top>();
-  Traits::select(*top, mutant);
+  traits.select(*top, mutant);
+  res.bus_hash = kFnvOffset;
   top->clk = 0;
   top->resetn = 0;
   top->mem_ready = 0;
@@ -84,12 +86,17 @@ RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cf
       mix(res.trace_hash, top->mem_addr);
       mix(res.trace_hash, top->mem_wdata);
       mix(res.trace_hash, next_rdata);
+      mix(res.bus_hash, (static_cast<std::uint64_t>(top->mem_instr) << 4U) | wstrb);
+      mix(res.bus_hash, top->mem_addr);
+      mix(res.bus_hash, top->mem_wdata);
     }
 
     top->clk = 0;
     top->eval();
+    traits.sample(*top);
     top->clk = 1;
     top->eval();
+    traits.sample(*top);
     top->mem_ready = next_ready;
     top->mem_rdata = next_rdata;
     res.cycles = cycle + 1;
@@ -108,7 +115,7 @@ RunResult run_program_t(std::span<const std::uint32_t> code, const RunConfig& cf
   }
 
   res.mem_hash = hash_ram(ram);
-  for (std::size_t i = 1; i < 32; ++i) res.regs[i] = Traits::reg(*top, i);
+  for (std::size_t i = 1; i < 32; ++i) res.regs[i] = traits.reg(*top, i);
   top->final();
   return res;
 }

@@ -9,6 +9,7 @@
 #include "model.hpp"
 #include "protocol.hpp"
 #include "sim_core.hpp"
+#include "sim_infect.hpp"
 
 namespace cutoff::engine {
 
@@ -27,6 +28,7 @@ struct Execution {
   ModelResult model;
   RunResult core;
   risk::SpeciesIds species;  // empty unless the campaign tracks species
+  std::vector<std::uint32_t> infected;  // drill only: bit K = mutant K infected by this program (see sim_infect.hpp)
 };
 
 // Generates program `program_id` of the campaign and runs it on the model and on the core.

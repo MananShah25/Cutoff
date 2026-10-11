@@ -88,6 +88,11 @@ const std::vector<Setting>& settings() {
       string_setting("checker.level", &CampaignConfig::checker),
       uint_setting("checker.max_cycles", &CampaignConfig::max_cycles, INT64_MAX),
       uint_setting("checker.max_instructions", &CampaignConfig::max_instructions, INT64_MAX),
+      bool_setting("drill.enabled", [](CampaignConfig& c, bool b) { c.drill = b; }),
+      uint_setting("drill.mutants", &CampaignConfig::drill_mutants, 100000),
+      {"drill.sample_seed", Type::Int, [](CampaignConfig& c, const TomlValue& v) { auto e = range_error("drill.sample_seed", v.i, -1, INT64_MAX); if (e.empty()) c.drill_sample_seed = v.i; return e; }},
+      string_setting("drill.operators", &CampaignConfig::drill_operators),
+      bool_setting("drill.filter", [](CampaignConfig& c, bool b) { c.drill_filter = b; }),
       bool_setting("species.op", [](CampaignConfig& c, bool b) { c.species.op = b; }),
       bool_setting("species.cross", [](CampaignConfig& c, bool b) { c.species.cross = b; }),
       double_setting("stop.epsilon", [](CampaignConfig& c, double d) { c.stop.epsilon = d; }),
@@ -164,6 +169,7 @@ std::string apply_toml(CampaignConfig& cfg, const TomlDoc& doc, const std::strin
 std::string validate(const CampaignConfig& cfg) {
   if (cfg.core_name != "picorv32") return "core.name \"" + cfg.core_name + "\" is not supported; only \"picorv32\" exists so far.";
   if (cfg.mutant > drill_mutant_count()) return "core.mutant " + std::to_string(cfg.mutant) + " does not exist: this build has mutants 1 to " + std::to_string(drill_mutant_count()) + " (list them with `cutoff build --drill --list`).";
+  if (cfg.drill && cfg.mutant >= 0) return "a drill runs its own mutants: leave core.mutant at -1 (or use `cutoff run --mutant N` for a single planted bug).";
   if (cfg.programs < 1) return "campaign.programs must be at least 1.";
   if (cfg.batch_size < 1) return "campaign.batch_size must be at least 1.";
   if (cfg.checker != "c1") return "checker.level \"" + cfg.checker + "\" is not available yet: only \"c1\" exists until Step 8 adds c2 and c3.";
@@ -184,6 +190,8 @@ std::string to_toml(const CampaignConfig& c) {
   os << "[generator]\nprofile = \"" << profile_name(c.gen.profile) << "\"\nmin_len = " << c.gen.min_len
      << "\nmax_len = " << c.gen.max_len << "\nmax_skip = " << c.gen.max_skip << "\n\n";
   os << "[checker]\nlevel = \"" << c.checker << "\"\nmax_cycles = " << c.max_cycles << "\nmax_instructions = " << c.max_instructions << "\n\n";
+  os << "[drill]\nenabled = " << (c.drill ? "true" : "false") << "\nmutants = " << c.drill_mutants << "\nsample_seed = " << c.drill_sample_seed
+     << "\noperators = \"" << c.drill_operators << "\"\nfilter = " << (c.drill_filter ? "true" : "false") << "\n\n";
   char eps[40], hours[40];
   std::snprintf(eps, sizeof eps, "%.17g", c.stop.epsilon);
   std::snprintf(hours, sizeof hours, "%.17g", c.max_hours);
@@ -210,7 +218,7 @@ std::uint64_t stream_hash(const CampaignConfig& cfg) {
   std::ostringstream os;
   os << cfg.core_name << '|' << cfg.mutant << '|' << cfg.seed << '|' << static_cast<int>(cfg.gen.profile) << '|' << cfg.gen.min_len << '|' << cfg.gen.max_len
      << '|' << cfg.gen.max_skip << '|' << cfg.checker << '|' << cfg.max_cycles << '|' << cfg.max_instructions << '|' << cfg.species.op
-     << cfg.species.cross << '|' << cfg.corrupt_core_every << '|' << gen::kGeneratorVersion;
+     << cfg.species.cross << '|' << cfg.drill << '|' << cfg.drill_filter << '|' << cfg.drill_mutants << '|' << cfg.drill_sample_seed << '|' << cfg.drill_operators << '|' << cfg.corrupt_core_every << '|' << gen::kGeneratorVersion;
   std::uint64_t h = 0xcbf29ce484222325ULL;
   for (const char ch : os.str()) {
     h ^= static_cast<unsigned char>(ch);

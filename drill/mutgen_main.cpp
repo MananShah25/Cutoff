@@ -33,7 +33,7 @@ bool write_if_changed(const std::string& path, const std::string& text) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  std::string rtl, wrapper, regions, out_rtl, out_manifest, out_wrapper, out_embed;
+  std::string rtl, wrapper, regions, out_rtl, out_manifest, out_wrapper, out_embed, out_infect_rtl, out_infect_wrapper;
   bool list = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -48,12 +48,14 @@ int main(int argc, char** argv) {
     else if (a == "--out-rtl") { if (!next(out_rtl)) return 3; }
     else if (a == "--out-manifest") { if (!next(out_manifest)) return 3; }
     else if (a == "--out-wrapper") { if (!next(out_wrapper)) return 3; }
+    else if (a == "--out-infect-rtl") { if (!next(out_infect_rtl)) return 3; }
+    else if (a == "--out-infect-wrapper") { if (!next(out_infect_wrapper)) return 3; }
     else if (a == "--out-embed") { if (!next(out_embed)) return 3; }
     else if (a == "--list") list = true;
     else { std::fprintf(stderr, "cutoff-mutgen: unknown option '%s'\n", a.c_str()); return 3; }
   }
-  if (rtl.empty() || wrapper.empty() || regions.empty() || (!list && (out_rtl.empty() || out_manifest.empty() || out_wrapper.empty() || out_embed.empty()))) {
-    std::fprintf(stderr, "usage: cutoff-mutgen --rtl FILE --wrapper FILE --regions FILE (--out-rtl FILE --out-manifest FILE --out-wrapper FILE --out-embed FILE | --list)\n");
+  if (rtl.empty() || wrapper.empty() || regions.empty() || (!list && (out_rtl.empty() || out_manifest.empty() || out_wrapper.empty() || out_embed.empty() || out_infect_rtl.empty() || out_infect_wrapper.empty()))) {
+    std::fprintf(stderr, "usage: cutoff-mutgen --rtl FILE --wrapper FILE --regions FILE (--out-rtl FILE --out-manifest FILE --out-wrapper FILE --out-embed FILE --out-infect-rtl FILE --out-infect-wrapper FILE | --list)\n");
     return 3;
   }
   std::string rtl_text, wrapper_text, regions_text;
@@ -68,7 +70,8 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (!write_if_changed(out_rtl, r.instrumented) || !write_if_changed(out_manifest, r.manifest) || !write_if_changed(out_wrapper, r.wrapper) ||
-      !write_if_changed(out_embed, cutoff::drill::embedded_source(r))) {
+      !write_if_changed(out_embed, cutoff::drill::embedded_source(r)) || !write_if_changed(out_infect_rtl, r.infect_source) ||
+      !write_if_changed(out_infect_wrapper, r.infect_wrapper)) {
     std::fprintf(stderr, "cutoff-mutgen: cannot write the output files\n");
     return 3;
   }

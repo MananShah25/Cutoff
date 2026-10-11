@@ -24,6 +24,7 @@ struct RunResult {
   std::uint64_t cycles = 0;
   std::uint64_t trace_hash = 0;  // FNV-1a over every accepted bus transfer
   std::uint64_t mem_hash = 0;    // hash_ram() of the final RAM, comparable with ModelResult::mem_hash
+  std::uint64_t bus_hash = 0;    // like trace_hash but without cycle numbers or read data: the untimed sequence of bus requests
   std::array<std::uint32_t, 32> regs{};
 };
 

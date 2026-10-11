@@ -27,6 +27,11 @@ struct Checkpoint {
   std::uint32_t sessions = 1;          // how many times this run has been started (1 + resumes)
   Totals totals;
   std::vector<SetState> sets;
+  // drill runs only
+  bool has_drill = false;
+  std::uint64_t drill_stop_at = 0;               // program count at which the stop rule first fired (0 = not yet)
+  std::vector<int> drill_ids;                    // the selected mutants
+  std::vector<std::uint64_t> drill_words;        // DrillTally::to_words()
 };
 
 // Writes to <path>.tmp and renames, so a crash never leaves a half-written checkpoint.
