@@ -1,0 +1,24 @@
+== 1. instrumented core, nothing mutated, against the original core's Step 4 gate (commit a982d0ebffbf)
+PASS  mutant 0, 8 worker(s): exit code 0 (got 0)
+PASS  mutant 0, 8 worker(s): events.bin == Step 4 gate (812caad7a0ed)
+PASS  mutant 0, 1 worker(s): exit code 0 (got 0)
+PASS  mutant 0, 1 worker(s): events.bin == Step 4 gate (812caad7a0ed)
+== 2. embedded manifest
+PASS  manifest has 201 mutants with ids 1..201
+== 3. obvious planted bug (ALU add -> subtract, line 1240)
+PASS  events.bin holds the same number of failures as summary.json (20)
+PASS  mutant 90: exit code 1 (got 1)
+PASS  mutant 90: first failing program is 0 (<= 3)
+== 4. informational scan: every mutant on the first 500 programs (not the drill)
+      164 of 201 mutants produced at least one failure in 500 programs
+      alu      12 of 12
+      branch   5 of 10
+      compare  9 of 9
+      decode   21 of 22
+      imm      19 of 30
+      memory   26 of 33
+      pc       18 of 23
+      regfile  19 of 24
+      shift    35 of 38
+results in /Users/mananshah25/GithubRepos/Cutoff/results/step6-20261011-023925; failures: 0
+script exit 0

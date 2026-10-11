@@ -1,0 +1,42 @@
+[core]
+name = "picorv32"
+mutant = 90
+
+[campaign]
+seed = 1
+programs = 20
+workers = 2
+batch_size = 64
+
+[generator]
+profile = "g0"
+min_len = 32
+max_len = 128
+max_skip = 8
+
+[checker]
+level = "c1"
+max_cycles = 200000
+max_instructions = 100000
+
+[species]
+op = true
+cross = true
+
+[stop]
+epsilon = 0
+confirm = 3
+min_programs = 1000
+checkpoint = 1000
+estimator = "good-turing"
+plateau_window = 5000
+max_hours = 0
+
+[output]
+dir = "/Users/mananshah25/GithubRepos/Cutoff/results/step6-20261011-023925"
+max_failure_dirs = 20
+
+[debug]
+corrupt_core_every = 0
+crash_worker_at = -1
+interrupt_after = 0

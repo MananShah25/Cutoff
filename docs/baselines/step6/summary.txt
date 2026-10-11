@@ -1,0 +1,3 @@
+Instrumented core: 201 mutants at 103 sites (source hash 9e672b4e97a3206b; 579 live expressions, 261 dead statements pruned)
+  by category: alu 12, branch 10, compare 9, decode 22, imm 30, memory 33, pc 23, regfile 24, shift 38,
+  by operator class: arith 11, bitwise 12, const 84, eq 8, logic 10, not 10, rel 9, shift 2, signed 11, stuck 44,

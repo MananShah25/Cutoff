@@ -1,0 +1,202 @@
+id	category	op_class	kind	line	failures	first_failure
+1	memory	logic	|| -> &&	382	500	0
+2	memory	arith	+ -> -	382	0	-1
+3	memory	const	2'b00 -> all ones	382	0	-1
+4	memory	const	2'b00 -> all ones	382	0	-1
+5	memory	const	4'b1111 -> all zeros	406	500	0
+6	memory	stuck	mem_la_wstrb[0] stuck-at-0	406	318	0
+7	memory	stuck	mem_la_wstrb[0] stuck-at-1	406	0	-1
+8	memory	stuck	mem_la_wstrb[3] stuck-at-0	406	302	1
+9	memory	stuck	mem_la_wstrb[3] stuck-at-1	406	0	-1
+10	memory	const	4'b1100 -> all zeros	411	204	1
+11	memory	const	4'b1100 -> all ones	411	204	1
+12	memory	const	4'b0011 -> all zeros	411	189	1
+13	memory	const	4'b0011 -> all ones	411	189	1
+14	memory	stuck	mem_la_wstrb[0] stuck-at-0	411	183	1
+15	memory	stuck	mem_la_wstrb[0] stuck-at-1	411	196	1
+16	memory	stuck	mem_la_wstrb[3] stuck-at-0	411	193	1
+17	memory	stuck	mem_la_wstrb[3] stuck-at-1	411	180	1
+18	memory	const	16'b0 -> all ones	413	170	6
+19	memory	const	16'b0 -> all ones	414	183	1
+20	memory	shift	<< amount + 1	419	319	1
+21	memory	shift	<< amount - 1	419	319	1
+22	memory	const	4'b0001 -> all zeros	419	319	1
+23	memory	const	4'b0001 -> all ones	419	261	1
+24	memory	stuck	mem_la_wstrb[0] stuck-at-0	419	116	1
+25	memory	stuck	mem_la_wstrb[0] stuck-at-1	419	262	1
+26	memory	stuck	mem_la_wstrb[3] stuck-at-0	419	128	1
+27	memory	stuck	mem_la_wstrb[3] stuck-at-1	419	261	1
+28	memory	bitwise	& -> |	576	424	1
+29	memory	bitwise	& -> ^	576	500	0
+30	imm	signed	drop $signed (zero- instead of sign-extend)	880	0	-1
+31	imm	const	1'b0 -> all ones	880	379	0
+32	decode	logic	&& -> ||	1040	481	0
+33	decode	eq	== -> !=	1040	493	0
+34	decode	const	3'b000 -> all ones	1040	414	0
+35	decode	logic	&& -> ||	1041	414	0
+36	decode	eq	== -> !=	1041	481	0
+37	decode	const	3'b001 -> all zeros	1041	387	0
+38	decode	const	3'b001 -> all ones	1041	428	0
+39	decode	logic	&& -> ||	1042	185	1
+40	decode	eq	== -> !=	1042	405	1
+41	decode	const	3'b100 -> all zeros	1042	369	1
+42	decode	const	3'b100 -> all ones	1042	369	1
+43	decode	logic	&& -> ||	1043	426	1
+44	decode	eq	== -> !=	1043	478	0
+45	decode	const	3'b101 -> all zeros	1043	376	0
+46	decode	const	3'b101 -> all ones	1043	418	0
+47	decode	logic	&& -> ||	1044	0	-1
+48	decode	eq	== -> !=	1044	367	1
+49	decode	const	3'b110 -> all zeros	1044	367	1
+50	decode	const	3'b110 -> all ones	1044	367	1
+51	decode	logic	&& -> ||	1045	374	1
+52	decode	eq	== -> !=	1045	476	0
+53	decode	const	3'b111 -> all zeros	1045	375	0
+54	imm	stuck	decoded_imm[0] stuck-at-0	1122	0	-1
+55	imm	stuck	decoded_imm[0] stuck-at-1	1122	0	-1
+56	imm	stuck	decoded_imm[31] stuck-at-0	1122	0	-1
+57	imm	stuck	decoded_imm[31] stuck-at-1	1122	0	-1
+58	imm	const	12 -> 0	1124	500	0
+59	imm	const	12 -> 1	1124	500	0
+60	imm	const	12 -> 13	1124	500	0
+61	imm	const	12 -> 11	1124	500	0
+62	imm	stuck	decoded_imm[0] stuck-at-0	1124	0	-1
+63	imm	stuck	decoded_imm[0] stuck-at-1	1124	500	0
+64	imm	stuck	decoded_imm[31] stuck-at-0	1124	500	0
+65	imm	stuck	decoded_imm[31] stuck-at-1	1124	500	0
+66	imm	signed	drop $signed (zero- instead of sign-extend)	1126	500	0
+67	imm	stuck	decoded_imm[0] stuck-at-0	1126	500	0
+68	imm	stuck	decoded_imm[0] stuck-at-1	1126	500	0
+69	imm	stuck	decoded_imm[31] stuck-at-0	1126	500	0
+70	imm	stuck	decoded_imm[31] stuck-at-1	1126	500	0
+71	imm	signed	drop $signed (zero- instead of sign-extend)	1128	0	-1
+72	imm	const	1'b0 -> all ones	1128	0	-1
+73	imm	stuck	decoded_imm[0] stuck-at-0	1128	0	-1
+74	imm	stuck	decoded_imm[0] stuck-at-1	1128	0	-1
+75	imm	stuck	decoded_imm[31] stuck-at-0	1128	0	-1
+76	imm	stuck	decoded_imm[31] stuck-at-1	1128	495	0
+77	imm	signed	drop $signed (zero- instead of sign-extend)	1130	403	1
+78	imm	stuck	decoded_imm[0] stuck-at-0	1130	424	1
+79	imm	stuck	decoded_imm[0] stuck-at-1	1130	500	0
+80	imm	stuck	decoded_imm[31] stuck-at-0	1130	403	1
+81	imm	stuck	decoded_imm[31] stuck-at-1	1130	500	0
+82	pc	logic	&& -> ||	1213	351	0
+83	pc	bitwise	& -> |	1213	495	0
+84	pc	bitwise	& -> ^	1213	495	0
+85	pc	not	drop ~	1213	487	0
+86	pc	not	~ -> !	1213	487	0
+87	pc	const	1 -> 0	1213	0	-1
+88	pc	const	1 -> 2	1213	0	-1
+89	alu	arith	- -> +	1240	267	1
+90	alu	arith	+ -> -	1240	500	0
+91	alu	stuck	alu_add_sub[0] stuck-at-0	1240	500	0
+92	alu	stuck	alu_add_sub[0] stuck-at-1	1240	500	0
+93	alu	stuck	alu_add_sub[31] stuck-at-0	1240	500	0
+94	alu	stuck	alu_add_sub[31] stuck-at-1	1240	500	0
+95	compare	eq	== -> !=	1241	428	0
+96	compare	rel	< -> <=	1242	91	1
+97	compare	rel	< -> >	1242	479	0
+98	compare	rel	< -> >=	1242	479	0
+99	compare	signed	< signed -> unsigned	1242	388	0
+100	compare	rel	< -> <=	1243	97	1
+101	compare	rel	< -> >	1243	474	0
+102	compare	rel	< -> >=	1243	477	0
+103	compare	signed	< unsigned -> signed	1243	393	0
+104	branch	not	drop !	1256	328	1
+105	branch	not	! -> ~	1256	0	-1
+106	branch	not	drop !	1258	311	0
+107	branch	not	! -> ~	1258	0	-1
+108	branch	not	drop !	1260	307	0
+109	branch	not	! -> ~	1260	0	-1
+110	alu	bitwise	^ -> |	1275	353	0
+111	alu	bitwise	^ -> &	1275	407	0
+112	alu	bitwise	| -> &	1277	394	0
+113	alu	bitwise	| -> ^	1277	346	1
+114	alu	bitwise	& -> |	1279	390	1
+115	alu	bitwise	& -> ^	1279	392	1
+116	regfile	arith	+ -> -	1317	419	0
+117	regfile	const	2 -> 0	1317	0	-1
+118	regfile	const	2 -> 1	1317	0	-1
+119	regfile	const	2 -> 3	1317	0	-1
+120	regfile	const	4 -> 0	1317	419	0
+121	regfile	const	4 -> 1	1317	421	0
+122	regfile	const	4 -> 5	1317	421	0
+123	regfile	const	4 -> 3	1317	422	0
+124	regfile	stuck	cpuregs_wrdata[0] stuck-at-0	1317	0	-1
+125	regfile	stuck	cpuregs_wrdata[0] stuck-at-1	1317	421	0
+126	regfile	stuck	cpuregs_wrdata[31] stuck-at-0	1317	0	-1
+127	regfile	stuck	cpuregs_wrdata[31] stuck-at-1	1317	420	0
+128	regfile	const	1 -> 0	1318	425	0
+129	regfile	const	1 -> 2	1318	425	0
+130	regfile	stuck	cpuregs_wrdata[0] stuck-at-0	1321	500	0
+131	regfile	stuck	cpuregs_wrdata[0] stuck-at-1	1321	500	0
+132	regfile	stuck	cpuregs_wrdata[31] stuck-at-0	1321	500	0
+133	regfile	stuck	cpuregs_wrdata[31] stuck-at-1	1321	500	0
+134	regfile	const	1 -> 0	1322	500	0
+135	regfile	const	1 -> 2	1322	500	0
+136	regfile	logic	&& -> ||	1338	500	0
+137	regfile	logic	&& -> ||	1338	500	0
+138	regfile	const	0 -> 1	1352	119	1
+139	regfile	const	0 -> 1	1353	139	6
+140	pc	bitwise	& -> |	1500	499	0
+141	pc	bitwise	& -> ^	1500	499	0
+142	pc	not	drop ~	1500	499	0
+143	pc	not	~ -> !	1500	499	0
+144	pc	const	1 -> 0	1500	248	0
+145	pc	const	1 -> 2	1500	248	0
+146	pc	arith	+ -> -	1560	500	0
+147	pc	const	2 -> 0	1560	0	-1
+148	pc	const	2 -> 1	1560	0	-1
+149	pc	const	2 -> 3	1560	0	-1
+150	pc	const	4 -> 0	1560	500	0
+151	pc	const	4 -> 1	1560	500	0
+152	pc	const	4 -> 5	1560	500	0
+153	pc	const	4 -> 3	1560	500	0
+154	pc	arith	+ -> -	1569	378	0
+155	pc	arith	+ -> -	1806	495	0
+156	branch	const	0 -> 1	1812	447	0
+157	branch	const	0 -> 1	1818	488	0
+158	branch	const	1 -> 0	1819	0	-1
+159	branch	const	1 -> 2	1819	0	-1
+160	shift	eq	== -> !=	1831	490	0
+161	shift	const	0 -> 1	1831	483	0
+162	shift	rel	>= -> >	1835	0	-1
+163	shift	rel	>= -> <	1835	498	0
+164	shift	rel	>= -> <=	1835	178	0
+165	shift	signed	>= unsigned -> signed	1835	0	-1
+166	shift	const	4 -> 0	1835	493	0
+167	shift	const	4 -> 1	1835	493	0
+168	shift	const	4 -> 5	1835	0	-1
+169	shift	const	4 -> 3	1835	396	0
+170	shift	const	4 -> 0	1838	322	0
+171	shift	const	4 -> 1	1838	319	0
+172	shift	const	4 -> 5	1838	302	0
+173	shift	const	4 -> 3	1838	310	0
+174	shift	const	4 -> 0	1839	332	0
+175	shift	const	4 -> 1	1839	323	0
+176	shift	const	4 -> 5	1839	301	0
+177	shift	const	4 -> 3	1839	309	0
+178	shift	signed	drop $signed (zero- instead of sign-extend)	1840	165	2
+179	shift	const	4 -> 0	1840	289	2
+180	shift	const	4 -> 1	1840	284	2
+181	shift	const	4 -> 5	1840	260	2
+182	shift	const	4 -> 3	1840	278	2
+183	shift	arith	- -> +	1842	451	0
+184	shift	const	4 -> 0	1842	495	0
+185	shift	const	4 -> 1	1842	456	0
+186	shift	const	4 -> 5	1842	462	0
+187	shift	const	4 -> 3	1842	456	0
+188	shift	const	1 -> 0	1846	284	0
+189	shift	const	1 -> 2	1846	274	0
+190	shift	const	1 -> 0	1847	284	0
+191	shift	const	1 -> 2	1847	277	0
+192	shift	signed	drop $signed (zero- instead of sign-extend)	1848	152	6
+193	shift	const	1 -> 0	1848	270	4
+194	shift	const	1 -> 2	1848	253	6
+195	shift	arith	- -> +	1850	450	0
+196	shift	const	1 -> 0	1850	493	0
+197	shift	const	1 -> 2	1850	486	0
+198	memory	arith	+ -> -	1869	470	0
+199	memory	arith	+ -> -	1897	6	5
+200	memory	signed	drop $signed (zero- instead of sign-extend)	1904	0	-1
+201	memory	signed	drop $signed (zero- instead of sign-extend)	1905	0	-1

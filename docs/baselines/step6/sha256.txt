@@ -1,0 +1,2 @@
+812caad7a0edeea676aebb6675e9e8f4db64ff271370a3daf3f1d10fdeeab598  m0-8w/events.bin
+812caad7a0edeea676aebb6675e9e8f4db64ff271370a3daf3f1d10fdeeab598  m0-1w/events.bin

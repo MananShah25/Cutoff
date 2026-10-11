@@ -1,0 +1,202 @@
+id	site	category	op_class	kind	line	original	mutated
+1	1	memory	logic	|| -> &&	382	mem_do_prefetch || mem_do_rinst	(mem_do_prefetch) && (mem_do_rinst)
+2	2	memory	arith	+ -> -	382	next_pc[31:2] + mem_la_firstword_xfer	(next_pc[31:2]) - (mem_la_firstword_xfer)
+3	3	memory	const	2'b00 -> all ones	382	2'b00	2'b11
+4	4	memory	const	2'b00 -> all ones	382	2'b00	2'b11
+5	5	memory	const	4'b1111 -> all zeros	406	4'b1111	4'b0000
+6	6	memory	stuck	mem_la_wstrb[0] stuck-at-0	406	4'b1111	((4'b1111) & ~4'h1)
+7	6	memory	stuck	mem_la_wstrb[0] stuck-at-1	406	4'b1111	((4'b1111) | 4'h1)
+8	6	memory	stuck	mem_la_wstrb[3] stuck-at-0	406	4'b1111	((4'b1111) & ~4'h8)
+9	6	memory	stuck	mem_la_wstrb[3] stuck-at-1	406	4'b1111	((4'b1111) | 4'h8)
+10	7	memory	const	4'b1100 -> all zeros	411	4'b1100	4'b0000
+11	7	memory	const	4'b1100 -> all ones	411	4'b1100	4'b1111
+12	8	memory	const	4'b0011 -> all zeros	411	4'b0011	4'b0000
+13	8	memory	const	4'b0011 -> all ones	411	4'b0011	4'b1111
+14	9	memory	stuck	mem_la_wstrb[0] stuck-at-0	411	reg_op1[1] ? 4'b1100 : 4'b0011	((reg_op1[1] ? 4'b1100 : 4'b0011) & ~4'h1)
+15	9	memory	stuck	mem_la_wstrb[0] stuck-at-1	411	reg_op1[1] ? 4'b1100 : 4'b0011	((reg_op1[1] ? 4'b1100 : 4'b0011) | 4'h1)
+16	9	memory	stuck	mem_la_wstrb[3] stuck-at-0	411	reg_op1[1] ? 4'b1100 : 4'b0011	((reg_op1[1] ? 4'b1100 : 4'b0011) & ~4'h8)
+17	9	memory	stuck	mem_la_wstrb[3] stuck-at-1	411	reg_op1[1] ? 4'b1100 : 4'b0011	((reg_op1[1] ? 4'b1100 : 4'b0011) | 4'h8)
+18	10	memory	const	16'b0 -> all ones	413	16'b0	16'b1111111111111111
+19	11	memory	const	16'b0 -> all ones	414	16'b0	16'b1111111111111111
+20	12	memory	shift	<< amount + 1	419	4'b0001 << reg_op1[1:0]	(4'b0001) << ((reg_op1[1:0]) + 1)
+21	12	memory	shift	<< amount - 1	419	4'b0001 << reg_op1[1:0]	(4'b0001) << ((reg_op1[1:0]) - 1)
+22	13	memory	const	4'b0001 -> all zeros	419	4'b0001	4'b0000
+23	13	memory	const	4'b0001 -> all ones	419	4'b0001	4'b1111
+24	14	memory	stuck	mem_la_wstrb[0] stuck-at-0	419	4'b0001 << reg_op1[1:0]	((4'b0001 << reg_op1[1:0]) & ~4'h1)
+25	14	memory	stuck	mem_la_wstrb[0] stuck-at-1	419	4'b0001 << reg_op1[1:0]	((4'b0001 << reg_op1[1:0]) | 4'h1)
+26	14	memory	stuck	mem_la_wstrb[3] stuck-at-0	419	4'b0001 << reg_op1[1:0]	((4'b0001 << reg_op1[1:0]) & ~4'h8)
+27	14	memory	stuck	mem_la_wstrb[3] stuck-at-1	419	4'b0001 << reg_op1[1:0]	((4'b0001 << reg_op1[1:0]) | 4'h8)
+28	15	memory	bitwise	& -> |	576	mem_la_wstrb & {4{mem_la_write}}	(mem_la_wstrb) | ({4{mem_la_write}})
+29	15	memory	bitwise	& -> ^	576	mem_la_wstrb & {4{mem_la_write}}	(mem_la_wstrb) ^ ({4{mem_la_write}})
+30	16	imm	signed	drop $signed (zero- instead of sign-extend)	880	$signed({mem_rdata_latched[31:12], 1'b0})	({mem_rdata_latched[31:12], 1'b0})
+31	17	imm	const	1'b0 -> all ones	880	1'b0	1'b1
+32	18	decode	logic	&& -> ||	1040	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b000	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b000)
+33	19	decode	eq	== -> !=	1040	mem_rdata_q[14:12] == 3'b000	(mem_rdata_q[14:12]) != (3'b000)
+34	20	decode	const	3'b000 -> all ones	1040	3'b000	3'b111
+35	21	decode	logic	&& -> ||	1041	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b001	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b001)
+36	22	decode	eq	== -> !=	1041	mem_rdata_q[14:12] == 3'b001	(mem_rdata_q[14:12]) != (3'b001)
+37	23	decode	const	3'b001 -> all zeros	1041	3'b001	3'b000
+38	23	decode	const	3'b001 -> all ones	1041	3'b001	3'b111
+39	24	decode	logic	&& -> ||	1042	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b100	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b100)
+40	25	decode	eq	== -> !=	1042	mem_rdata_q[14:12] == 3'b100	(mem_rdata_q[14:12]) != (3'b100)
+41	26	decode	const	3'b100 -> all zeros	1042	3'b100	3'b000
+42	26	decode	const	3'b100 -> all ones	1042	3'b100	3'b111
+43	27	decode	logic	&& -> ||	1043	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b101	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b101)
+44	28	decode	eq	== -> !=	1043	mem_rdata_q[14:12] == 3'b101	(mem_rdata_q[14:12]) != (3'b101)
+45	29	decode	const	3'b101 -> all zeros	1043	3'b101	3'b000
+46	29	decode	const	3'b101 -> all ones	1043	3'b101	3'b111
+47	30	decode	logic	&& -> ||	1044	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b110	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b110)
+48	31	decode	eq	== -> !=	1044	mem_rdata_q[14:12] == 3'b110	(mem_rdata_q[14:12]) != (3'b110)
+49	32	decode	const	3'b110 -> all zeros	1044	3'b110	3'b000
+50	32	decode	const	3'b110 -> all ones	1044	3'b110	3'b111
+51	33	decode	logic	&& -> ||	1045	is_beq_bne_blt_bge_bltu_bgeu && mem_rdata_q[14:12] == 3'b111	(is_beq_bne_blt_bge_bltu_bgeu) || (mem_rdata_q[14:12] == 3'b111)
+52	34	decode	eq	== -> !=	1045	mem_rdata_q[14:12] == 3'b111	(mem_rdata_q[14:12]) != (3'b111)
+53	35	decode	const	3'b111 -> all zeros	1045	3'b111	3'b000
+54	36	imm	stuck	decoded_imm[0] stuck-at-0	1122	decoded_imm_j	((decoded_imm_j) & ~32'h00000001)
+55	36	imm	stuck	decoded_imm[0] stuck-at-1	1122	decoded_imm_j	((decoded_imm_j) | 32'h00000001)
+56	36	imm	stuck	decoded_imm[31] stuck-at-0	1122	decoded_imm_j	((decoded_imm_j) & ~32'h80000000)
+57	36	imm	stuck	decoded_imm[31] stuck-at-1	1122	decoded_imm_j	((decoded_imm_j) | 32'h80000000)
+58	37	imm	const	12 -> 0	1124	12	0
+59	37	imm	const	12 -> 1	1124	12	1
+60	37	imm	const	12 -> 13	1124	12	13
+61	37	imm	const	12 -> 11	1124	12	11
+62	38	imm	stuck	decoded_imm[0] stuck-at-0	1124	mem_rdata_q[31:12] << 12	((mem_rdata_q[31:12] << 12) & ~32'h00000001)
+63	38	imm	stuck	decoded_imm[0] stuck-at-1	1124	mem_rdata_q[31:12] << 12	((mem_rdata_q[31:12] << 12) | 32'h00000001)
+64	38	imm	stuck	decoded_imm[31] stuck-at-0	1124	mem_rdata_q[31:12] << 12	((mem_rdata_q[31:12] << 12) & ~32'h80000000)
+65	38	imm	stuck	decoded_imm[31] stuck-at-1	1124	mem_rdata_q[31:12] << 12	((mem_rdata_q[31:12] << 12) | 32'h80000000)
+66	39	imm	signed	drop $signed (zero- instead of sign-extend)	1126	$signed(mem_rdata_q[31:20])	(mem_rdata_q[31:20])
+67	40	imm	stuck	decoded_imm[0] stuck-at-0	1126	$signed(mem_rdata_q[31:20])	(($signed(mem_rdata_q[31:20])) & ~32'h00000001)
+68	40	imm	stuck	decoded_imm[0] stuck-at-1	1126	$signed(mem_rdata_q[31:20])	(($signed(mem_rdata_q[31:20])) | 32'h00000001)
+69	40	imm	stuck	decoded_imm[31] stuck-at-0	1126	$signed(mem_rdata_q[31:20])	(($signed(mem_rdata_q[31:20])) & ~32'h80000000)
+70	40	imm	stuck	decoded_imm[31] stuck-at-1	1126	$signed(mem_rdata_q[31:20])	(($signed(mem_rdata_q[31:20])) | 32'h80000000)
+71	41	imm	signed	drop $signed (zero- instead of sign-extend)	1128	$signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})	({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})
+72	42	imm	const	1'b0 -> all ones	1128	1'b0	1'b1
+73	43	imm	stuck	decoded_imm[0] stuck-at-0	1128	$signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})	(($signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})) & ~32'h00000001)
+74	43	imm	stuck	decoded_imm[0] stuck-at-1	1128	$signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})	(($signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})) | 32'h00000001)
+75	43	imm	stuck	decoded_imm[31] stuck-at-0	1128	$signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})	(($signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})) & ~32'h80000000)
+76	43	imm	stuck	decoded_imm[31] stuck-at-1	1128	$signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})	(($signed({mem_rdata_q[31], mem_rdata_q[7], mem_rdata_q[30:25], mem_rdata_q[11:8], 1'b0})) | 32'h80000000)
+77	44	imm	signed	drop $signed (zero- instead of sign-extend)	1130	$signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})	({mem_rdata_q[31:25], mem_rdata_q[11:7]})
+78	45	imm	stuck	decoded_imm[0] stuck-at-0	1130	$signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})	(($signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})) & ~32'h00000001)
+79	45	imm	stuck	decoded_imm[0] stuck-at-1	1130	$signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})	(($signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})) | 32'h00000001)
+80	45	imm	stuck	decoded_imm[31] stuck-at-0	1130	$signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})	(($signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})) & ~32'h80000000)
+81	45	imm	stuck	decoded_imm[31] stuck-at-1	1130	$signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})	(($signed({mem_rdata_q[31:25], mem_rdata_q[11:7]})) | 32'h80000000)
+82	46	pc	logic	&& -> ||	1213	latched_store && latched_branch	(latched_store) || (latched_branch)
+83	47	pc	bitwise	& -> |	1213	reg_out & ~1	(reg_out) | (~1)
+84	47	pc	bitwise	& -> ^	1213	reg_out & ~1	(reg_out) ^ (~1)
+85	48	pc	not	drop ~	1213	~1	(1)
+86	48	pc	not	~ -> !	1213	~1	!(1)
+87	49	pc	const	1 -> 0	1213	1	0
+88	49	pc	const	1 -> 2	1213	1	2
+89	50	alu	arith	- -> +	1240	reg_op1 - reg_op2	(reg_op1) + (reg_op2)
+90	51	alu	arith	+ -> -	1240	reg_op1 + reg_op2	(reg_op1) - (reg_op2)
+91	52	alu	stuck	alu_add_sub[0] stuck-at-0	1240	instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2	((instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2) & ~32'h00000001)
+92	52	alu	stuck	alu_add_sub[0] stuck-at-1	1240	instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2	((instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2) | 32'h00000001)
+93	52	alu	stuck	alu_add_sub[31] stuck-at-0	1240	instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2	((instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2) & ~32'h80000000)
+94	52	alu	stuck	alu_add_sub[31] stuck-at-1	1240	instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2	((instr_sub ? reg_op1 - reg_op2 : reg_op1 + reg_op2) | 32'h80000000)
+95	53	compare	eq	== -> !=	1241	reg_op1 == reg_op2	(reg_op1) != (reg_op2)
+96	54	compare	rel	< -> <=	1242	$signed(reg_op1) < $signed(reg_op2)	($signed(reg_op1)) <= ($signed(reg_op2))
+97	54	compare	rel	< -> >	1242	$signed(reg_op1) < $signed(reg_op2)	($signed(reg_op1)) > ($signed(reg_op2))
+98	54	compare	rel	< -> >=	1242	$signed(reg_op1) < $signed(reg_op2)	($signed(reg_op1)) >= ($signed(reg_op2))
+99	54	compare	signed	< signed -> unsigned	1242	$signed(reg_op1) < $signed(reg_op2)	(reg_op1) < (reg_op2)
+100	55	compare	rel	< -> <=	1243	reg_op1 < reg_op2	(reg_op1) <= (reg_op2)
+101	55	compare	rel	< -> >	1243	reg_op1 < reg_op2	(reg_op1) > (reg_op2)
+102	55	compare	rel	< -> >=	1243	reg_op1 < reg_op2	(reg_op1) >= (reg_op2)
+103	55	compare	signed	< unsigned -> signed	1243	reg_op1 < reg_op2	$signed(reg_op1) < $signed(reg_op2)
+104	56	branch	not	drop !	1256	!alu_eq	(alu_eq)
+105	56	branch	not	! -> ~	1256	!alu_eq	~(alu_eq)
+106	57	branch	not	drop !	1258	!alu_lts	(alu_lts)
+107	57	branch	not	! -> ~	1258	!alu_lts	~(alu_lts)
+108	58	branch	not	drop !	1260	!alu_ltu	(alu_ltu)
+109	58	branch	not	! -> ~	1260	!alu_ltu	~(alu_ltu)
+110	59	alu	bitwise	^ -> |	1275	reg_op1 ^ reg_op2	(reg_op1) | (reg_op2)
+111	59	alu	bitwise	^ -> &	1275	reg_op1 ^ reg_op2	(reg_op1) & (reg_op2)
+112	60	alu	bitwise	| -> &	1277	reg_op1 | reg_op2	(reg_op1) & (reg_op2)
+113	60	alu	bitwise	| -> ^	1277	reg_op1 | reg_op2	(reg_op1) ^ (reg_op2)
+114	61	alu	bitwise	& -> |	1279	reg_op1 & reg_op2	(reg_op1) | (reg_op2)
+115	61	alu	bitwise	& -> ^	1279	reg_op1 & reg_op2	(reg_op1) ^ (reg_op2)
+116	62	regfile	arith	+ -> -	1317	reg_pc + (latched_compr ? 2 : 4)	(reg_pc) - ((latched_compr ? 2 : 4))
+117	63	regfile	const	2 -> 0	1317	2	0
+118	63	regfile	const	2 -> 1	1317	2	1
+119	63	regfile	const	2 -> 3	1317	2	3
+120	64	regfile	const	4 -> 0	1317	4	0
+121	64	regfile	const	4 -> 1	1317	4	1
+122	64	regfile	const	4 -> 5	1317	4	5
+123	64	regfile	const	4 -> 3	1317	4	3
+124	65	regfile	stuck	cpuregs_wrdata[0] stuck-at-0	1317	reg_pc + (latched_compr ? 2 : 4)	((reg_pc + (latched_compr ? 2 : 4)) & ~32'h00000001)
+125	65	regfile	stuck	cpuregs_wrdata[0] stuck-at-1	1317	reg_pc + (latched_compr ? 2 : 4)	((reg_pc + (latched_compr ? 2 : 4)) | 32'h00000001)
+126	65	regfile	stuck	cpuregs_wrdata[31] stuck-at-0	1317	reg_pc + (latched_compr ? 2 : 4)	((reg_pc + (latched_compr ? 2 : 4)) & ~32'h80000000)
+127	65	regfile	stuck	cpuregs_wrdata[31] stuck-at-1	1317	reg_pc + (latched_compr ? 2 : 4)	((reg_pc + (latched_compr ? 2 : 4)) | 32'h80000000)
+128	66	regfile	const	1 -> 0	1318	1	0
+129	66	regfile	const	1 -> 2	1318	1	2
+130	67	regfile	stuck	cpuregs_wrdata[0] stuck-at-0	1321	latched_stalu ? alu_out_q : reg_out	((latched_stalu ? alu_out_q : reg_out) & ~32'h00000001)
+131	67	regfile	stuck	cpuregs_wrdata[0] stuck-at-1	1321	latched_stalu ? alu_out_q : reg_out	((latched_stalu ? alu_out_q : reg_out) | 32'h00000001)
+132	67	regfile	stuck	cpuregs_wrdata[31] stuck-at-0	1321	latched_stalu ? alu_out_q : reg_out	((latched_stalu ? alu_out_q : reg_out) & ~32'h80000000)
+133	67	regfile	stuck	cpuregs_wrdata[31] stuck-at-1	1321	latched_stalu ? alu_out_q : reg_out	((latched_stalu ? alu_out_q : reg_out) | 32'h80000000)
+134	68	regfile	const	1 -> 0	1322	1	0
+135	68	regfile	const	1 -> 2	1322	1	2
+136	69	regfile	logic	&& -> ||	1338	resetn && cpuregs_write && latched_rd	(resetn && cpuregs_write) || (latched_rd)
+137	70	regfile	logic	&& -> ||	1338	resetn && cpuregs_write	(resetn) || (cpuregs_write)
+138	71	regfile	const	0 -> 1	1352	0	1
+139	72	regfile	const	0 -> 1	1353	0	1
+140	73	pc	bitwise	& -> |	1500	(latched_stalu ? alu_out_q : reg_out) & ~1	((latched_stalu ? alu_out_q : reg_out)) | (~1)
+141	73	pc	bitwise	& -> ^	1500	(latched_stalu ? alu_out_q : reg_out) & ~1	((latched_stalu ? alu_out_q : reg_out)) ^ (~1)
+142	74	pc	not	drop ~	1500	~1	(1)
+143	74	pc	not	~ -> !	1500	~1	!(1)
+144	75	pc	const	1 -> 0	1500	1	0
+145	75	pc	const	1 -> 2	1500	1	2
+146	76	pc	arith	+ -> -	1560	current_pc + (compressed_instr ? 2 : 4)	(current_pc) - ((compressed_instr ? 2 : 4))
+147	77	pc	const	2 -> 0	1560	2	0
+148	77	pc	const	2 -> 1	1560	2	1
+149	77	pc	const	2 -> 3	1560	2	3
+150	78	pc	const	4 -> 0	1560	4	0
+151	78	pc	const	4 -> 1	1560	4	1
+152	78	pc	const	4 -> 5	1560	4	5
+153	78	pc	const	4 -> 3	1560	4	3
+154	79	pc	arith	+ -> -	1569	current_pc + decoded_imm_j	(current_pc) - (decoded_imm_j)
+155	80	pc	arith	+ -> -	1806	reg_pc + decoded_imm	(reg_pc) - (decoded_imm)
+156	81	branch	const	0 -> 1	1812	0	1
+157	82	branch	const	0 -> 1	1818	0	1
+158	83	branch	const	1 -> 0	1819	1	0
+159	83	branch	const	1 -> 2	1819	1	2
+160	84	shift	eq	== -> !=	1831	reg_sh == 0	(reg_sh) != (0)
+161	85	shift	const	0 -> 1	1831	0	1
+162	86	shift	rel	>= -> >	1835	reg_sh >= 4	(reg_sh) > (4)
+163	86	shift	rel	>= -> <	1835	reg_sh >= 4	(reg_sh) < (4)
+164	86	shift	rel	>= -> <=	1835	reg_sh >= 4	(reg_sh) <= (4)
+165	86	shift	signed	>= unsigned -> signed	1835	reg_sh >= 4	$signed(reg_sh) >= $signed(4)
+166	87	shift	const	4 -> 0	1835	4	0
+167	87	shift	const	4 -> 1	1835	4	1
+168	87	shift	const	4 -> 5	1835	4	5
+169	87	shift	const	4 -> 3	1835	4	3
+170	88	shift	const	4 -> 0	1838	4	0
+171	88	shift	const	4 -> 1	1838	4	1
+172	88	shift	const	4 -> 5	1838	4	5
+173	88	shift	const	4 -> 3	1838	4	3
+174	89	shift	const	4 -> 0	1839	4	0
+175	89	shift	const	4 -> 1	1839	4	1
+176	89	shift	const	4 -> 5	1839	4	5
+177	89	shift	const	4 -> 3	1839	4	3
+178	90	shift	signed	drop $signed (zero- instead of sign-extend)	1840	$signed(reg_op1)	(reg_op1)
+179	91	shift	const	4 -> 0	1840	4	0
+180	91	shift	const	4 -> 1	1840	4	1
+181	91	shift	const	4 -> 5	1840	4	5
+182	91	shift	const	4 -> 3	1840	4	3
+183	92	shift	arith	- -> +	1842	reg_sh - 4	(reg_sh) + (4)
+184	93	shift	const	4 -> 0	1842	4	0
+185	93	shift	const	4 -> 1	1842	4	1
+186	93	shift	const	4 -> 5	1842	4	5
+187	93	shift	const	4 -> 3	1842	4	3
+188	94	shift	const	1 -> 0	1846	1	0
+189	94	shift	const	1 -> 2	1846	1	2
+190	95	shift	const	1 -> 0	1847	1	0
+191	95	shift	const	1 -> 2	1847	1	2
+192	96	shift	signed	drop $signed (zero- instead of sign-extend)	1848	$signed(reg_op1)	(reg_op1)
+193	97	shift	const	1 -> 0	1848	1	0
+194	97	shift	const	1 -> 2	1848	1	2
+195	98	shift	arith	- -> +	1850	reg_sh - 1	(reg_sh) + (1)
+196	99	shift	const	1 -> 0	1850	1	0
+197	99	shift	const	1 -> 2	1850	1	2
+198	100	memory	arith	+ -> -	1869	reg_op1 + decoded_imm	(reg_op1) - (decoded_imm)
+199	101	memory	arith	+ -> -	1897	reg_op1 + decoded_imm	(reg_op1) - (decoded_imm)
+200	102	memory	signed	drop $signed (zero- instead of sign-extend)	1904	$signed(mem_rdata_word[15:0])	(mem_rdata_word[15:0])
+201	103	memory	signed	drop $signed (zero- instead of sign-extend)	1905	$signed(mem_rdata_word[7:0])	(mem_rdata_word[7:0])
