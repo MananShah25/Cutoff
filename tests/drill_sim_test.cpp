@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <tuple>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -16,6 +17,8 @@
 #include "campaign_config.hpp"
 #include "check.hpp"
 #include "generator.hpp"
+#include "model.hpp"
+#include "rv32i.hpp"
 #include "protocol.hpp"
 #include "run.hpp"
 #include "run_command.hpp"
@@ -159,6 +162,42 @@ TEST(DrillSim, AnObviousPlantedBugIsCaughtByC1WithinAFewPrograms) {
       if (evaluate_program(cfg, id).verdict != static_cast<std::uint8_t>(Verdict::Pass)) first_failure = static_cast<int>(id);
     EXPECT_GE(first_failure, 0) << "mutant " << m << " was not caught in 10 programs";
     EXPECT_LE(first_failure, 3) << "mutant " << m << " should be caught within the first few programs";
+  }
+}
+
+TEST(DrillSim, TheSignExtensionOfBranchAndJumpOffsetsOnlyShowsOnBackwardJumpsWhichG0NeverGenerates) {
+  // In the 500-program scan the mutants that drop $signed from the J-immediate (line 880) and the B-immediate (line 1128)
+  // survive: G0 emits only forward jumps and branches, so those offsets are never negative. Hand-written programs with a
+  // backward jump and a backward branch expose them, which shows these are stimulus gaps, not equivalent mutants.
+  const int j_imm = find_mutant(880, "drop $signed (zero- instead of sign-extend)");
+  const int b_imm = find_mutant(1128, "drop $signed (zero- instead of sign-extend)");
+  ASSERT_GT(j_imm, 0);
+  ASSERT_GT(b_imm, 0);
+
+  const std::vector<std::uint32_t> backward_jump = {
+      rv::jal(0, 12),            // 0:  jump forward to 12
+      rv::lui(4, 0x10000),       // 4:  <- the backward jump lands here
+      rv::sw(1, 4, 0),           // 8:  exit with x1
+      rv::addi(1, 0, 42),        // 12
+      rv::jal(0, -12),           // 16: backward to 4
+  };
+  const std::vector<std::uint32_t> backward_branch = {
+      rv::addi(1, 0, 3),         // 0
+      rv::addi(2, 2, 7),         // 4:  <- loop body
+      rv::addi(1, 1, -1),        // 8
+      rv::bne(1, 0, -8),         // 12: backward to 4
+      rv::lui(4, 0x10000),       // 16
+      rv::sw(2, 4, 0),           // 20: exit with x2 = 21
+  };
+  for (const auto& [program, mutant, expected_exit] : {std::tuple{backward_jump, j_imm, 42u}, std::tuple{backward_branch, b_imm, 21u}}) {
+    const ModelResult model = run_model(program, {1000, false});
+    ASSERT_EQ(model.status, Status::Exited);
+    ASSERT_EQ(model.exit_code, expected_exit);
+    const RunResult none = run_program_mutant(program, 0, {20000});
+    EXPECT_EQ(none.status, Status::Exited);
+    EXPECT_EQ(none.exit_code, expected_exit) << "the unmutated instrumented core runs the program correctly";
+    const RunResult bad = run_program_mutant(program, static_cast<std::uint32_t>(mutant), {20000});
+    EXPECT_TRUE(bad.status != Status::Exited || bad.exit_code != expected_exit) << "mutant " << mutant << " must be exposed by a backward offset";
   }
 }
 
