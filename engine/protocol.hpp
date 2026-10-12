@@ -24,6 +24,7 @@ enum class Verdict : std::uint8_t {
   RegMismatch = 5,       // a final register differs; `detail` is the first differing register
   MemMismatch = 6,       // final memory hash differs
   StoreMismatch = 7,     // ordered memory-interface store trace differs (C2)
+  RetireMismatch = 8,    // RVFI retire trace differs (C3)
 };
 
 const char* to_string(Verdict v);

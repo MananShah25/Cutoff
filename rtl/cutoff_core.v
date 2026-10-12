@@ -13,6 +13,19 @@ module cutoff_core (
 	output [31:0] mem_wdata,
 	output [ 3:0] mem_wstrb,
 	input  [31:0] mem_rdata
+`ifdef RISCV_FORMAL
+	,output rvfi_valid,
+	output [63:0] rvfi_order,
+	output [31:0] rvfi_insn,
+	output [31:0] rvfi_pc_rdata,
+	output [4:0] rvfi_rd_addr,
+	output [31:0] rvfi_rd_wdata,
+	output [31:0] rvfi_mem_addr,
+	output [3:0] rvfi_mem_rmask,
+	output [3:0] rvfi_mem_wmask,
+	output [31:0] rvfi_mem_rdata,
+	output [31:0] rvfi_mem_wdata
+`endif
 );
 	/* verilator lint_off UNUSEDSIGNAL */
 	wire        la_read, la_write, pcpi_valid;
@@ -72,5 +85,10 @@ module cutoff_core (
 		.eoi         (eoi),
 		.trace_valid (trace_valid),
 		.trace_data  (trace_data)
+	`ifdef RISCV_FORMAL
+		,.rvfi_valid(rvfi_valid), .rvfi_order(rvfi_order), .rvfi_insn(rvfi_insn), .rvfi_pc_rdata(rvfi_pc_rdata),
+		.rvfi_rd_addr(rvfi_rd_addr), .rvfi_rd_wdata(rvfi_rd_wdata), .rvfi_mem_addr(rvfi_mem_addr),
+		.rvfi_mem_rmask(rvfi_mem_rmask), .rvfi_mem_wmask(rvfi_mem_wmask), .rvfi_mem_rdata(rvfi_mem_rdata), .rvfi_mem_wdata(rvfi_mem_wdata)
+	`endif
 	);
 endmodule

@@ -19,6 +19,7 @@ const char* to_string(Verdict v) {
     case Verdict::RegMismatch: return "register-mismatch";
     case Verdict::MemMismatch: return "memory-mismatch";
     case Verdict::StoreMismatch: return "store-mismatch";
+    case Verdict::RetireMismatch: return "retire-mismatch";
   }
   return "?";
 }

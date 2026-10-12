@@ -37,6 +37,21 @@ CheckOutcome check_c2(const ModelResult& model, const RunResult& core) {
   return {};
 }
 
+CheckOutcome check_c3(const ModelResult& model, const RunResult& core, std::span<const RvfiRecord> rvfi) {
+  if (const CheckOutcome base = check_c2(model, core); base.verdict != Verdict::Pass) return base;
+  // The testbench's magic exit-store is consumed externally before PicoRV32
+  // retires it, so it has no RVFI event.  C2 above has already checked that
+  // precise store; compare every architectural retirement preceding it here.
+  const std::size_t expected = model.retired.empty() ? 0 : model.retired.size() - 1;
+  if (expected != rvfi.size()) return {Verdict::RetireMismatch, 0};
+  for (std::size_t i = 0; i < expected; ++i) {
+    const auto& m = model.retired[i];
+    const auto& r = rvfi[i];
+    if (m.pc != r.pc || m.insn != r.insn || m.rd != r.rd || m.rd_value != r.rd_value) return {Verdict::RetireMismatch, 0};
+  }
+  return {};
+}
+
 Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   Execution e;
   const std::uint64_t seed = gen::program_seed(cfg.seed, program_id);
@@ -44,7 +59,8 @@ Execution execute_program(const CampaignConfig& cfg, std::uint64_t program_id) {
   const bool want_species = cfg.species.any();
   e.model = run_model(e.program.code, {cfg.max_instructions, want_species || cfg.checker != "c1"});
   if (want_species && e.model.status == Status::Exited) e.species = risk::extract_species(e.model.retired, cfg.species);
-  if (cfg.drill) {  // the golden run of a drill is the infect model, which behaves exactly like the original core
+  if (cfg.checker == "c3") { auto r = run_program_rvfi(e.program.code, {cfg.max_cycles, 64}); e.core = std::move(r.run); e.rvfi = std::move(r.retired); }
+  else if (cfg.drill) {  // the golden run of a drill is the infect model, which behaves exactly like the original core
     InfectedRun g = run_program_infected(e.program.code, {cfg.max_cycles});
     e.core = g.run;
     e.infected = std::move(g.words);
@@ -85,7 +101,7 @@ ProgramResult evaluate(const CampaignConfig& cfg, std::uint64_t program_id) {
   Execution e = execute_program(cfg, program_id);
   const ModelResult& model = e.model;
   const RunResult& core = e.core;
-  const CheckOutcome outcome = cfg.checker == "c2" ? check_c2(model, core) : check_c1(model, core);
+  const CheckOutcome outcome = cfg.checker == "c3" ? check_c3(model, core, e.rvfi) : cfg.checker == "c2" ? check_c2(model, core) : check_c1(model, core);
   EventRecord rec;
   rec.program_id = program_id;
   rec.seed = e.program.seed;

@@ -3,6 +3,7 @@
 // that workers run.
 
 #include <cstdint>
+#include <span>
 
 #include "campaign_config.hpp"
 #include "generator.hpp"
@@ -10,6 +11,7 @@
 #include "protocol.hpp"
 #include "sim_core.hpp"
 #include "sim_infect.hpp"
+#include "sim_rvfi.hpp"
 
 namespace cutoff::engine {
 
@@ -22,6 +24,7 @@ struct CheckOutcome {
 // then a core Timeout is a Hang; then status, exit code, registers, memory.
 CheckOutcome check_c1(const ModelResult& model, const RunResult& core);
 CheckOutcome check_c2(const ModelResult& model, const RunResult& core);
+CheckOutcome check_c3(const ModelResult& model, const RunResult& core, std::span<const RvfiRecord> rvfi);
 
 // Everything one program produces; failure reports need the full results, not just the compact record.
 struct Execution {
@@ -30,6 +33,7 @@ struct Execution {
   RunResult core;
   risk::SpeciesIds species;  // empty unless the campaign tracks species
   std::vector<std::uint32_t> infected;  // drill only: bit K = mutant K infected by this program (see sim_infect.hpp)
+  std::vector<RvfiRecord> rvfi;  // C3 only
 };
 
 // Generates program `program_id` of the campaign and runs it on the model and on the core.

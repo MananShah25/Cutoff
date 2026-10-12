@@ -17,6 +17,17 @@ if(CUTOFF_SANITIZE)
 endif()
 set_source_files_properties(sim_core.cpp PROPERTIES COMPILE_OPTIONS "${CUTOFF_OWN_FLAGS}")
 
+# RVFI-enabled golden core for checker C3. Keep it separate from C1/C2 so enabling observation cannot alter their build.
+add_library(cutoff_sim_rvfi STATIC sim_rvfi.cpp)
+target_include_directories(cutoff_sim_rvfi PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(cutoff_sim_rvfi PUBLIC cutoff_model)
+verilate(cutoff_sim_rvfi
+  SOURCES ${CUTOFF_RTL}/cutoff_core.v ${CUTOFF_RTL}/picorv32/picorv32.v
+  TOP_MODULE cutoff_core
+  PREFIX Vcutoff_rvfi
+  VERILATOR_ARGS --public-flat-rw --no-timing --x-assign 0 --x-initial 0 -O2 -DRISCV_FORMAL -Wno-PINMISSING)
+set_source_files_properties(sim_rvfi.cpp PROPERTIES COMPILE_OPTIONS "${CUTOFF_OWN_FLAGS}")
+
 # ---------------------------------------------------------------------------------------------------------------------
 # The instrumented ("drill") core: picorv32 with every mutation selectable through mut_sel, generated from the pinned,
 # unmodified picorv32.v by cutoff-mutgen. Verilator's CMake helper runs at configure time, so the generator is compiled

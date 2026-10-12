@@ -10,7 +10,7 @@ namespace cutoff::engine {
 namespace {
 
 constexpr char kMagic[8] = {'C', 'U', 'T', 'O', 'F', 'F', 'C', 'K'};
-constexpr std::uint32_t kVersion = 3;  // C2 adds StoreMismatch to Totals::by_verdict.
+constexpr std::uint32_t kVersion = 4;  // C3 adds RetireMismatch to Totals::by_verdict.
 
 std::uint64_t fnv(const char* data, std::size_t n) {
   std::uint64_t h = 0xcbf29ce484222325ULL;
