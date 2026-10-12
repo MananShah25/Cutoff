@@ -7,6 +7,7 @@
 
 #include "build_command.hpp"
 #include "doctor.hpp"
+#include "replay_command.hpp"
 #include "run_command.hpp"
 
 namespace {
@@ -19,6 +20,7 @@ void usage() {
       "  doctor    check Verilator, compiler, cores and disk space\n"
       "  run       run random programs on the core and check them (see `cutoff run --help`)\n"
       "  drill     plant bugs in the core and measure how many the campaign finds (see `cutoff drill --help`)\n"
+      "  replay    re-run one saved program (see `cutoff replay --help`)\n"
       "  build     report the built-in cores; `build --drill [--list]` describes the instrumented core\n",
       stderr);
 }
@@ -36,6 +38,7 @@ int dispatch(int argc, char** argv) {
   if (cmd == "doctor") return cutoff::doctor_main();
   if (cmd == "build") return cutoff::build_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
   if (cmd == "drill") return cutoff::drill_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
+  if (cmd == "replay") return cutoff::replay_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
   if (cmd == "run") return cutoff::run_command(std::vector<std::string>(argv + 2, argv + argc), std::cout, std::cerr);
   std::fprintf(stderr, "cutoff: unknown or not-yet-implemented command '%s'\n\n", argv[1]);
   usage();

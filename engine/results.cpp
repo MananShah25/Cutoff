@@ -175,7 +175,8 @@ void ResultsWriter::write_failure_dir(const EventRecord& rec) {
   ++totals_.failure_dirs_written;
 
   const Execution e = execute_program(cfg_, rec.program_id);
-  const CheckOutcome outcome = check_c1(e.model, e.core);
+  const CheckOutcome outcome = cfg_.checker == "c3" ? check_c3(e.model, e.core, e.rvfi)
+      : cfg_.checker == "c2" ? check_c2(e.model, e.core) : check_c1(e.model, e.core);
   std::ostringstream t;
   t << "program id:        " << rec.program_id << "\n"
     << "program seed:      " << hex64(rec.seed) << "\n"
@@ -198,7 +199,7 @@ void ResultsWriter::write_failure_dir(const EventRecord& rec) {
     t << "  x" << i << ": " << hex32(e.model.regs[i]) << " vs " << hex32(e.core.regs[i]) << "\n";
   }
   t << "\nTo reproduce: the program is regenerated from the program seed with the generator settings above\n"
-       "(program.hex holds the exact words). The `cutoff replay` command arrives in a later step.\n";
+       "(program.hex holds the exact words). Replay: cutoff replay " << dir_ << " " << rec.program_id << "\n";
   std::string ignored;
   write_text(dir / "failure.txt", t.str(), ignored);
 

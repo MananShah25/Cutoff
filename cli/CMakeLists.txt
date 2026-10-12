@@ -1,4 +1,4 @@
-add_library(cutoff_cli STATIC doctor.cpp run_command.cpp build_command.cpp)
+add_library(cutoff_cli STATIC doctor.cpp run_command.cpp build_command.cpp replay_command.cpp)
 target_include_directories(cutoff_cli PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(cutoff_cli PUBLIC cutoff_sim cutoff_engine PRIVATE cutoff_warnings)
 
